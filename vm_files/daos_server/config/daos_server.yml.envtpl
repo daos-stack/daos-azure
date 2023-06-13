@@ -1,0 +1,36 @@
+name: daos_server
+access_points: [${DAOS_AP_LIST}]
+port: 10001
+transport_config:
+  allow_insecure: true
+provider: ofi+tcp;ofi_rxm
+disable_vfio: true
+disable_vmd: true
+control_log_file: /var/daos/daos_server.log
+helper_log_file: /var/daos/daos_server_helper.log
+firmware_helper_log_file: /var/daos/daos_firmware_helper.log
+telemetry_port: 9191
+engines:
+-
+  targets: 1
+  nr_xs_helpers: 0
+  pinned_numa_node: 0
+  fabric_iface: eth0
+  fabric_iface_port: 31416
+  log_mask: INFO
+  log_file: /var/daos/daos_engine.0.log
+  env_vars:
+    - FI_OFI_RXM_DEF_TCP_WAIT_OBJ=pollfd
+    - DTX_AGG_THD_CNT=16777216
+    - DTX_AGG_THD_AGE=700
+    - FI_SOCKETS_MAX_CONN_RETRY=1
+    - FI_SOCKETS_CONN_TIMEOUT=2000
+
+  storage:
+  -
+    scm_mount: /var/daos/ram
+    class: ram
+    scm_size: ${DAOS_SCM_SIZE}
+  -
+    class: nvme
+    bdev_list: ["${DAOS_BDEV_ADDR}"]

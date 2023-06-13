@@ -1,0 +1,329 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]",
+      "metadata": {
+        "description": "Location for all resources"
+      }
+    },
+    "resourcePrefix": {
+      "type": "string",
+      "metadata": {
+        "description": "String that will prefix all resource names"
+      }
+    },
+
+    "existingVnetResourceGroupName": {
+      "type": "String",
+      "metadata": {
+        "description": "Name of the resource group for the existing virtual network to deploy the scale set into"
+      }
+    },
+    "existingVnetName": {
+      "type": "String",
+      "metadata": {
+        "description": "Name of the existing virtual network to deploy the scale set into"
+      }
+    },
+    "existingSubnetName": {
+      "type": "String",
+      "metadata": {
+        "description": "Name of the existing subnet to deploy the scale set into"
+      }
+    },
+    "daosAdminSku": {
+      "defaultValue": "Standard_L8s_v3",
+      "type": "String",
+      "metadata": {
+        "description": "The SKU for the DAOS server"
+      }
+    },
+    "daosAdminImageName": {
+      "defaultValue": "azure-daos-alma8-20230613033522",
+      "type": "String",
+      "metadata": {
+        "description": "The name of the disk image for the DAOS admin VM"
+      }
+    },
+    "daosServerImageName": {
+      "defaultValue": "azure-daos-alma8-20230613033522",
+      "type": "String",
+      "metadata": {
+        "description": "The name of the disk image for the DAOS server VM"
+      }
+    },
+    "daosServerSku": {
+      "defaultValue": "Standard_L8s_v3",
+      "type": "String",
+      "metadata": {
+        "description": "The SKU for the DAOS server"
+      }
+    },
+    "adminUser": {
+      "type": "String",
+      "defaultValue": "daos_admin",
+      "metadata": {
+        "description": "The admin username for all DAOS instances."
+      }
+    },
+    "adminRsaPublicKey": {
+      "type": "String",
+      "metadata": {
+        "description": "The RSA public key to access the instances."
+      }
+    },
+    "serverCount": {
+      "type": "Int",
+      "defaultValue": 1,
+      "metadata": {
+        "description": "The number of DAOS servers to deploy"
+      }
+    },
+    "serverNumDisks": {
+      "type": "Int",
+      "defaultValue": 1,
+      "metadata": {
+        "description": "The number of disks on the daos servers"
+      }
+    },
+    "serverDiskSize": {
+      "defaultValue": 1024,
+      "type": "Int",
+      "metadata": {
+        "description": "The size of the DAOS server disks"
+      }
+    },
+    "serverStorageSku": {
+      "defaultValue": "Premium_LRS",
+      "type": "String",
+      "metadata": {
+        "description": "The SKU for the DAOS server disks"
+      }
+    },
+    "serverCacheOption": {
+      "defaultValue": "None",
+      "type": "String",
+      "metadata": {
+        "description": "The caching option for the DAOS server disks"
+      }
+    },
+    "useAvailabilityZone": {
+      "defaultValue": false,
+      "type": "Bool",
+      "metadata": {
+        "description": "Use an availability zone for the DAOS VMs"
+      }
+    },
+    "availabilityZone": {
+      "defaultValue": 1,
+      "type": "Int",
+      "minValue": 1,
+      "maxValue": 3,
+      "metadata": {
+        "description": "The availability zone to use for the DAOS VMs"
+      }
+    }
+  },
+  "functions": [],
+  "variables": {
+    "baseName": "[if(empty(parameters('resourcePrefix')), 'daos', format('{0}-daos', parameters('resourcePrefix')))]",
+    "adminVmName": "[format('{0}-admin-0001', variables('baseName'))]",
+    "adminVmNicName": "[format('{0}-admin-0001-nic', variables('baseName'))]",
+    "serverVmBaseName": "[format('{0}-server', variables('baseName'))]",
+    "vmScalesetName": "[format('{0}-vmss', variables('serverVmBaseName'))]",
+    "subnet": "[resourceId(parameters('existingVnetResourceGroupName'), 'Microsoft.Network/virtualNetworks/subnets', parameters('existingVnetName'), parameters('existingSubNetName'))]",
+    "adminImageId": "[resourceId(parameters('existingVnetResourceGroupName'), 'Microsoft.Compute/images', parameters('daosAdminImageName'))]",
+    "serverImageId": "[resourceId(parameters('existingVnetResourceGroupName'), 'Microsoft.Compute/images', parameters('daosServerImageName'))]",
+    "imagePlan": {
+      "name": "8-gen2",
+      "publisher": "almalinux",
+      "product": "almalinux"
+    },
+    "adminImageReference": {
+      "id": "[variables('adminImageId')]"
+    },
+    "serverImageReference": {
+      "id": "[variables('serverImageId')]"
+    },
+    "ciScript": "",
+    "copy": [
+      {
+        "name": "serverDataDisks",
+        "count": "[parameters('serverNumDisks')]",
+        "input": {
+          "caching": "[parameters('serverCacheOption')]",
+          "managedDisk": {
+            "storageAccountType": "[parameters('serverStorageSku')]"
+          },
+          "createOption": "Empty",
+          "lun": "[copyIndex('serverDataDisks')]",
+          "diskSizeGB": "[parameters('serverDiskSize')]"
+        }
+      }
+    ]
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Network/networkInterfaces",
+      "apiVersion": "2022-07-01",
+      "name": "[variables('adminVmNicName')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "enableAcceleratedNetworking": true,
+        "enableIPForwarding": true,
+        "ipConfigurations": [
+          {
+            "name": "ipConfig",
+            "properties": {
+              "privateIPAllocationMethod": "Dynamic",
+              "subnet": {
+                "id": "[variables('subnet')]"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.Compute/virtualMachines",
+      "apiVersion": "2022-11-01",
+      "name": "[variables('adminVmName')]",
+      "location": "[parameters('location')]",
+      "plan": "[variables('imagePlan')]",
+      "zones": "[if(parameters('useAvailabilityZone'), array(format('{0}', parameters('availabilityZone'))), null())]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/networkInterfaces', variables('adminVmNicName'))]"
+      ],
+      "tags": {
+        "filesystem": "daos"
+      },
+      "properties": {
+        "hardwareProfile": {
+          "vmSize": "[parameters('daosAdminSku')]"
+        },
+        "osProfile": {
+          "computerName": "[variables('adminVmName')]",
+          "adminUsername": "[parameters('adminUser')]",
+          "linuxConfiguration": {
+            "disablePasswordAuthentication": true,
+            "ssh": {
+              "publicKeys": [
+                {
+                  "path": "[format('/home/{0}/.ssh/authorized_keys', parameters('adminUser'))]",
+                  "keyData": "[parameters('adminRsaPublicKey')]"
+                }
+              ]
+            },
+            "provisionVMAgent": true,
+            "patchSettings": {
+              "patchMode": "ImageDefault",
+              "assessmentMode": "ImageDefault"
+            }
+          }
+        },
+        "storageProfile": {
+          "imageReference": "[variables('adminImageReference')]",
+          "osDisk": {
+            "createOption": "fromImage",
+            "caching": "ReadWrite",
+            "managedDisk": {
+              "storageAccountType": "Premium_LRS"
+            },
+            "deleteOption": "Delete"
+          }
+        },
+        "networkProfile": {
+          "networkInterfaces": [
+            {
+              "id": "[resourceId('Microsoft.Network/networkInterfaces', variables('adminVmNicName'))]",
+              "properties": {
+                "deleteOption": "Delete"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Compute/virtualMachineScaleSets",
+      "apiVersion": "2021-07-01",
+      "name": "[variables('vmScalesetName')]",
+      "location": "[parameters('location')]",
+      "plan": "[variables('imagePlan')]",
+      "zones": "[if(parameters('useAvailabilityZone'), array(format('{0}', parameters('availabilityZone'))), null())]",
+      "tags": {
+        "filesystem": "daos"
+      },
+      "sku": {
+        "name": "[parameters('daosServerSku')]",
+        "tier": "Standard",
+        "capacity": "[parameters('serverCount')]"
+      },
+      "properties": {
+        "overprovision": false,
+        "upgradePolicy": {
+          "mode": "Manual"
+        },
+        "virtualMachineProfile": {
+          "storageProfile": {
+            "imageReference": "[variables('serverImageReference')]",
+            "osDisk": {
+              "createOption": "FromImage",
+              "caching": "ReadWrite"
+            },
+            "dataDisks": "[variables('serverDataDisks')]"
+          },
+          "osProfile": {
+            "computerNamePrefix": "[concat(variables('serverVmBaseName'), '-')]",
+            "adminUsername": "[parameters('adminUser')]",
+            "customData": "[base64(variables('ciScript'))]",
+            "linuxConfiguration": {
+              "disablePasswordAuthentication": true,
+              "ssh": {
+                "publicKeys": [
+                  {
+                    "path": "[format('/home/{0}/.ssh/authorized_keys', parameters('adminUser'))]",
+                    "keyData": "[parameters('adminRsaPublicKey')]"
+                  }
+                ]
+              }
+            }
+          },
+          "networkProfile": {
+            "networkInterfaceConfigurations": [
+              {
+                "name": "[format('{0}-nic', variables('serverVmBaseName'))]",
+                "properties": {
+                  "primary": true,
+                  "enableAcceleratedNetworking": true,
+                  "ipConfigurations": [
+                    {
+                      "name": "ipConfig-vmss",
+                      "properties": {
+                        "subnet": {
+                          "id": "[variables('subnet')]"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "outputs": {
+    "resourceIds": {
+      "type": "array",
+      "value": [
+        "[resourceId(resourceGroup().name, 'Microsoft.Compute/virtualMachines', variables('adminVmName'))]",
+        "[resourceId(resourceGroup().name, 'Microsoft.Compute/virtualMachineScaleSets', variables('vmScalesetName'))]"
+      ]
+    }
+  }
+}
