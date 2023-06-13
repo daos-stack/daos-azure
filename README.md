@@ -22,16 +22,55 @@ Automation scripts for deploying DAOS on Azure
    See [Prerequisites](./docs/prerequisites.md) for instructions.
 
 2. **Build the DAOS image**
+
+   ```bash
+   cd images
+   ./build.sh
+   ```
+
    See [images/README.md](./images/README.md) for details.
 
 3. **Deploy DAOS Servers**
 
-   Deploy the default configuration consisting of 3 servers.
+   ```bash
+   cd bin
+   cp daos_servers_deploy.env.example daos_servers_deploy.env
+   # Modify daos_servers_deploy.env
+   ./daos_servers_deploy.sh
+   ```
+
+4. **Deploy DAOS Clients**
 
    ```bash
    cd bin
-   ./daos_servers_deploy.sh
+   cp daos_clients_deploy.env.example daos_clients_deploy.env
+   # Modify daos_clients_deploy.env
+   ./daos_clients_deploy.sh
    ```
+
+5. **Log into first client**
+
+   TODO: Provide instructions for setting up an Azure bastion and tunneling through it to the first client VM.
+
+6. **Undeploy the Clients and Servers**
+
+   Re-use the .env files that were used for deployment.
+
+   ```bash
+   cd bin
+
+   DAOS_CLIENTS_UNDEPLOY_ENV_FILE="daos_clients_deploy.env"
+   ./daos_clients_undeploy.sh
+
+   DAOS_SERVERS_UNDEPLOY_ENV_FILE="daos_servers_deploy.env"
+   ./daos_servers_undeploy.sh
+   ```
+
+## Support
+
+As this repo is in the very early stages of development there is not official support for the content within.
+
+More information will be added later.
 
 ## Versions
 
