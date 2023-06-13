@@ -2,8 +2,8 @@
 
 set -eo pipefail
 
-# trap 'error_handler' ERR
-# trap 'cleanup' SIGINT
+trap 'echo "daos_client_setup.sh : Unknown error occurred. Exiting."' ERR
+
 echo "BEGIN: daos_client_setup.sh"
 
 SCRIPT_DIR="$(realpath "$(dirname $0)")"
@@ -57,28 +57,47 @@ start_service() {
   systemctl start daos_agent
 }
 
-load_env
-disable_waagent
-gen_ap_list
-gen_config
-start_service
-
-# Create script to create and mount container
-cat >/home/daos_admin/create_and_mount_cont.sh <<EOF
+gen_cont_script() {
+  # Generate script to create and mount container
+  cat >/home/daos_admin/create_and_mount_cont.sh <<'EOF'
 #!/usr/bin/env bash
-daos container create --type=POSIX --properties=rf:0 pool1 cont1
-MOUNT_DIR="${HOME}/daos/cont1"
+
+DAOS_POOL_NAME="pool1"
+DAOS_CONT_NAME="cont1"
+
+echo "Creating container '${DAOS_CONT_NAME}' in pool '${DAOS_POOL_NAME}'"
+daos container create --type=POSIX --properties=rf:0 "${DAOS_POOL_NAME}" "${DAOS_CONT_NAME}"
+
+MOUNT_DIR="${HOME}/daos/${DAOS_CONT_NAME}"
 mkdir -p "${MOUNT_DIR}"
-dfuse --singlethread --pool=pool1 --container=cont1 --mountpoint="${MOUNT_DIR}"
+
+dfuse --singlethread --pool="${DAOS_POOL_NAME}" --container="${DAOS_CONT_NAME}" --mountpoint="${MOUNT_DIR}"
 df -h -t fuse.daos
 
+echo
+echo
 echo "To create a large file in the container"
-echo "cd ${HOME}/daos/cont1"
+echo "cd ${MOUNT_DIR}"
 echo "time LD_PRELOAD=/usr/lib64/libioil.so dd if=/dev/zero of=./test21G.img bs=1G count=20"
 echo
+echo "To use the intercept library"
+echo "time LD_PRELOAD=/usr/lib64/libpil4dfs.so dd if=/dev/zero of=./test21G.img bs=1G count=20"
+echo
+
 EOF
 
-chmod 755 /home/daos_admin/create_and_mount_cont.sh
-chown daos_admin:daos_admin /home/daos_admin/create_and_mount_cont.sh
+  chmod 755 /home/daos_admin/create_and_mount_cont.sh
+  chown daos_admin:daos_admin /home/daos_admin/create_and_mount_cont.sh
+}
 
-echo "END: daos_client_setup.sh"
+main() {
+  load_env
+  disable_waagent
+  gen_ap_list
+  gen_config
+  start_service
+  gen_cont_script
+  echo "END: daos_client_setup.sh"
+}
+
+main
