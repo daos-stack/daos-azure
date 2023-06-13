@@ -1,0 +1,293 @@
+---
+- name: Install DAOS
+  hosts: 127.0.0.1
+  connection: local
+  become: true
+
+  vars:
+    daos_git_repo_url: "https://github.com/daos-stack/daos.git"
+    daos_git_repo_clone_dir: "~/daos"
+    daos_git_repo_branch: "master"
+    daos_git_repo_tag: "v2.3.107-tb"
+    daos_utils_script: "utils/scripts/install-el8.sh"
+    daos_apply_patches: false
+    daos_patch_files_dir: "/tmp/daos_patches"
+    daos_config_files_dir: "/tmp/daos_config"
+    daos_prefix_path: "/opt/daos"
+    daos_server_service_user: "root"
+    daos_server_service_group: "root"
+    daos_python_version: "3.11"
+
+    packages:
+      - clustershell
+      - createrepo_c
+      - curl
+      - dnf-plugins-core
+      - fuse
+      - git
+      - jq
+      - kmod
+      - patch
+      - pciutils
+      - pdsh
+      - "python{{ daos_python_version }}"
+      - "python{{ daos_python_version }}-pip"
+      - "python{{ daos_python_version }}-devel"
+      - rsync
+      - wget
+
+  tasks:
+    - name: DEBUG
+      debug:
+        msg: |
+          daos_git_repo_url = "{{ daos_git_repo_url }}"
+          daos_git_repo_clone_dir = "{{ daos_git_repo_clone_dir }}"
+          daos_git_repo_branch = "{{ daos_git_repo_branch }}"
+          daos_git_repo_tag = "{{ daos_git_repo_tag }}"
+          daos_utils_script = "{{ daos_utils_script }}"
+          daos_apply_patches = "{{ daos_apply_patches }}"
+          daos_patch_files_dir = "{{ daos_patch_files_dir }}"
+          daos_config_files_dir = "{{ daos_config_files_dir }}"
+          daos_prefix_path = "{{ daos_prefix_path }}"
+          daos_server_service_user = "{{ daos_server_service_user }}"
+          daos_server_service_group = "{{ daos_server_service_group }}"
+          daos_python_version = "{{ daos_python_version }}"
+
+    - name: Set facts
+      ansible.builtin.set_fact:
+        python_binary_path: "/usr/bin/python{{ daos_python_version }}"
+
+    - name: Enable the powertools repo
+      ansible.builtin.dnf:
+        enablerepo: powertools
+
+    - name: Install the 'Development tools' package group
+      ansible.builtin.dnf:
+        name: "@Development tools"
+        state: present
+
+    - name: Install required packages
+      ansible.builtin.package:
+        name: "{{ packages }}"
+        state: present
+
+    - name: Stat /usr/bin/python3
+      ansible.builtin.stat:
+        path: /usr/bin/python3
+      register: daos_python3_link
+
+    - name: Set python3 version
+      ansible.builtin.shell: "alternatives --set python3 {{ python_binary_path }}"
+      when:
+        - daos_python3_link.stat.exists | bool
+        - daos_python3_link.stat.islnk | bool
+        - daos_python3_link.stat.lnk_source != python_binary_path
+
+    - debug:
+        msg: "version = {{ (daos_git_repo_branch != '') | ternary(daos_git_repo_branch, daos_git_repo_tag)  }}"
+
+    - name: Clone daos git repo
+      ansible.builtin.git:
+        repo: "{{ daos_git_repo_url }}"
+        dest: "{{ daos_git_repo_clone_dir }}"
+        version: "{{ (daos_git_repo_branch != '') | ternary(daos_git_repo_branch, daos_git_repo_tag)  }}"
+        single_branch: yes
+        recursive: true
+        force: true
+
+    - name: Run script to install packages for DAOS build
+      ansible.builtin.shell: |
+        dnf config-manager --save --setopt=assumeyes=True
+        {{ daos_utils_script }}
+        dnf config-manager --save --setopt=assumeyes=False
+      args:
+        chdir: "{{ daos_git_repo_clone_dir }}"
+
+    - name: Setup Python virtualenv
+      ansible.builtin.shell: |
+        python3 -m venv .venv
+        source .venv/bin/activate
+        pip install --upgrade pip
+        pip install -r requirements.txt
+      args:
+        chdir: "{{ daos_git_repo_clone_dir }}"
+        creates: "{{ daos_git_repo_clone_dir }}/.venv"
+
+    - name: Apply patches
+      block:
+        - name: Find patch files
+          ansible.builtin.find:
+            paths: "{{ daos_patch_files_dir }}"
+            patterns: "*.patch"
+          register: daos_patch_files
+
+        - debug:
+            var: daos_patch_files
+
+        - name: Apply patches
+          ansible.builtin.shell: "patch -p1 < {{ item.path }}"
+          args:
+            executable: /bin/bash
+            chdir: "{{ daos_git_repo_clone_dir }}"
+          loop: "{{ daos_patch_files.files }}"
+
+      when: daos_apply_patches | bool
+
+    - name: Build DAOS
+      ansible.builtin.shell: |
+        source .venv/bin/activate
+        scons PREFIX="{{ daos_prefix_path }}" \
+            TARGET_TYPE=release \
+            BUILD_TYPE=release \
+            --jobs="$(nproc --all)" \
+            --build-deps=only \
+            --config=force
+      args:
+        chdir: "{{ daos_git_repo_clone_dir }}"
+        creates: "{{ daos_prefix_path }}/prereq"
+
+    - name: Install DAOS
+      ansible.builtin.shell: |
+        source .venv/bin/activate
+        scons PREFIX="{{ daos_prefix_path }}" \
+          TARGET_TYPE=release \
+          BUILD_TYPE=release \
+          CONF_DIR=/etc/daos \
+          --jobs="$(nproc --all)" \
+          install
+      args:
+        chdir: "{{ daos_git_repo_clone_dir }}"
+        creates: "{{ daos_prefix_path }}/bin/daos"
+
+    - name: Create symlinks for DAOS binaries
+      block:
+        - name: Find DAOS binary files
+          ansible.builtin.find:
+            paths: "{{ daos_prefix_path }}/bin"
+            patterns: "*"
+          register: daos_binary_files
+
+        - name: Create /usr/bin symlinks to DAOS binaries
+          ansible.builtin.file:
+            src: "{{ item.path }}"
+            dest: "/usr/bin/{{ item.path | basename }}"
+            state: link
+            owner: root
+            group: root
+            mode: "0755"
+          loop: "{{ daos_binary_files.files }}"
+
+    - name: Create symlinks for DAOS libraries
+      ansible.builtin.file:
+        src: "{{ item.src }}"
+        dest: "{{ item.dest }}"
+        state: link
+        owner: root
+        group: root
+        mode: "0755"
+      loop:
+        - { src: "{{ daos_prefix_path }}/lib64/libioil.so", dest: "/usr/lib64/libioil.so" }
+        - { src: "{{ daos_prefix_path }}/lib64/libpil4dfs.so", dest: "/usr/lib64/libpil4dfs.so" }
+
+    - name: Create DAOS groups
+      ansible.builtin.group:
+        name: "{{ item }}"
+        system: true
+        state: present
+      loop:
+        - daos_admin
+        - daos_agent
+        - daos_server
+        - daos_metrics
+        - daos_daemons
+
+    - name: Create DAOS users
+      ansible.builtin.user:
+        name: "{{ item }}"
+        shell: /bin/bash
+        groups: "daos_daemons,{{ item }}"
+        append: yes
+        create_home: true
+        state: present
+      loop:
+        - daos_admin
+        - daos_agent
+        - daos_server
+        - daos_metrics
+        - daos_daemons
+
+    - name: Create sudoers.d files
+      ansible.builtin.copy:
+        content: "{{ item }} ALL=(ALL) NOPASSWD: ALL"
+        dest: /etc/sudoers.d/user
+        owner: root
+        group: root
+        mode: "0440"
+      loop:
+        - daos_admin
+        - daos_agent
+        - daos_server
+
+    - name: Create DAOS dirs
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+      loop:
+        - /var/run/daos_server
+        - /var/run/daos_agent
+        - /var/daos/ram
+        - /var/log/daos
+        - /etc/daos/certs
+
+    - name: Copy DAOS configuration files to config dir
+      ansible.builtin.copy:
+        src: "{{ item }}"
+        dest: "/etc/daos/{{ item | basename }}"
+        owner: root
+        group: root
+        mode: "0644"
+        remote_src: true
+      loop:
+        - "{{ daos_config_files_dir }}/daos_agent.yml"
+        - "{{ daos_config_files_dir }}/daos_control.yml"
+        - "{{ daos_config_files_dir }}/daos_server.yml"
+
+    - name: Copy systemd service files
+      ansible.builtin.copy:
+        src: "{{ daos_git_repo_clone_dir }}/utils/systemd/{{ item }}"
+        dest: "/etc/systemd/system/{{ item }}"
+        owner: root
+        group: root
+        mode: "0644"
+        remote_src: true
+      loop:
+        - daos_agent.service
+        - daos_server.service
+
+    - name: Update daos_server systemd service file
+      ansible.builtin.lineinfile:
+        path: /etc/systemd/system/daos_server.service
+        regexp: "{{ item.regexp }}"
+        line: "{{ item.line }}"
+        owner: root
+        group: root
+        mode: "0644"
+      loop:
+        - { regexp: "^User=.*", line: "User={{ daos_server_service_user }}" }
+        - { regexp: "^Group=.*", line: "Group={{ daos_server_service_group }}" }
+
+    - name: Force systemd to reread configs
+      ansible.builtin.systemd:
+        daemon_reload: true
+
+    #- name: Run spdk setup.sh
+    #  ansible.builtin.command: "{{ daos_prefix_path }}/prereq/release/spdk/share/spdk/scripts/setup.sh"
+
+    - name: Create spdk symlinks
+      ansible.builtin.file:
+        src: "/root/daos/build/external/release/spdk"
+        dest: "/usr/share/spdk"
+        state: link
