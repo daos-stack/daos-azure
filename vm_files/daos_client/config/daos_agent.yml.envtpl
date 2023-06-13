@@ -1,0 +1,7 @@
+# DAOS agent configuration file.
+name: daos_server
+access_points: [${DAOS_AP_LIST}]
+port: 10001
+
+transport_config:
+  allow_insecure: true
