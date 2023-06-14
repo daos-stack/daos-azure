@@ -30,7 +30,6 @@ engines:
   -
     scm_mount: /var/daos/ram
     class: ram
-    scm_size: ${DAOS_SCM_SIZE}
   -
     class: nvme
     bdev_list: ["${DAOS_BDEV_ADDR}"]

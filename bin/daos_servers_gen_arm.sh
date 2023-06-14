@@ -27,7 +27,6 @@ DAOS_AZ_ARM_DEST_TEMPLATE="${DAOS_AZ_ARM_DEST_TEMPLATE:="azuredeploy_server.json
 DAOS_VM_FILES_DIR="${DAOS_VM_FILES_DIR:="${VM_FILES_DIR}"}"
 DAOS_VM_ENTRY_SCRIPT="${DAOS_VM_ENTRY_SCRIPT:="daos_server_setup.sh"}"
 DAOS_VM_BASE_NAME="${DAOS_VM_BASE_NAME:="${DAOS_AZ_RESOURCE_PREFIX}-daos-server"}"
-DAOS_SCM_SIZE="${DAOS_SCM_SIZE:=40}"
 DAOS_AZ_serverCount="${DAOS_AZ_serverCount:=1}"
 
 create_start_script_env_file() {
@@ -35,7 +34,6 @@ create_start_script_env_file() {
   cat >"${start_script_env_file}" <<EOF
 DAOS_VM_BASE_NAME="${DAOS_VM_BASE_NAME}"
 DAOS_AZ_serverCount=$DAOS_AZ_serverCount
-DAOS_SCM_SIZE=${DAOS_SCM_SIZE}
 EOF
 }
 
