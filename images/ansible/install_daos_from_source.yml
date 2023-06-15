@@ -8,7 +8,7 @@
     daos_git_repo_url: "https://github.com/daos-stack/daos.git"
     daos_git_repo_clone_dir: "~/daos"
     daos_git_repo_branch: "master"
-    daos_git_repo_tag: "v2.3.107-tb"
+    daos_git_repo_tag: "v2.3.108-tb"
     daos_utils_script: "utils/scripts/install-el8.sh"
     daos_apply_patches: false
     daos_patch_files_dir: "/tmp/daos_patches"
@@ -17,6 +17,14 @@
     daos_server_service_user: "root"
     daos_server_service_group: "root"
     daos_python_version: "3.11"
+
+    # Variables needed to install libfabric
+    daos_repo_version: "2.3.108"
+    daos_repo_base_url: "https://packages.daos.io/private"
+    daos_packages_repo: "EL8/packages/x86_64"
+    daos_rpm_repo_url: "{{ daos_repo_base_url }}/v{{ daos_repo_version }}/{{ daos_packages_repo }}"
+    daos_rpm_repo_file_url: "{{ daos_rpm_repo_url }}/daos_packages.repo"
+    daos_rpm_repo_gpg_key_url: "https://packages.daos.io/RPM-GPG-KEY-2023"
 
     packages:
       - clustershell
@@ -85,6 +93,29 @@
 
     - debug:
         msg: "version = {{ (daos_git_repo_branch != '') | ternary(daos_git_repo_branch, daos_git_repo_tag)  }}"
+
+    - name: Install libfabric v1.18
+      block:
+        - name: Install GPG key
+          ansible.builtin.rpm_key:
+            key: "{{ daos_rpm_repo_gpg_key_url }}"
+            state: present
+
+        - name: Add DAOS repo
+          ansible.builtin.get_url:
+            url: "{{ daos_rpm_repo_file_url }}"
+            dest: /etc/yum.repos.d/daos_packages.repo
+            owner: root
+            group: root
+            mode: "0644"
+
+        - name: Install libfabric v1.18.0 packages
+          ansible.builtin.package:
+            name: "{{ item }}"
+            state: present
+          loop:
+            - "libfabric-1.18.0"
+            - "libfabric-devel-1.18.0"
 
     - name: Clone daos git repo
       ansible.builtin.git:

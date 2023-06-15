@@ -34,22 +34,7 @@
         "description": "Name of the existing subnet to deploy the scale set into"
       }
     },
-    "daosAdminSku": {
-      "defaultValue": "Standard_L8s_v3",
-      "type": "String",
-      "metadata": {
-        "description": "The SKU for the DAOS client"
-      }
-    },
-    "daosAdminImageName": {
-      "defaultValue": "azure-daos-alma8-20230613033522",
-      "type": "String",
-      "metadata": {
-        "description": "The name of the disk image for the DAOS admin VM"
-      }
-    },
     "daosClientImageName": {
-      "defaultValue": "azure-daos-alma8-20230613033522",
       "type": "String",
       "metadata": {
         "description": "The name of the disk image for the DAOS client VM"
