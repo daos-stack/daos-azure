@@ -5,7 +5,7 @@
 # contains env vars to override settings for this script.
 set -eo pipefail
 
-trap 'echo "daos_clients_gen_arm.sh : Unexpected error. Exiting.' ERR
+trap 'echo "daos_clients_gen_arm.sh : Unexpected error. Exiting."' ERR
 
 SCRIPT_DIR="$(realpath "$(dirname $0)")"
 SCRIPT_FILE=$(basename "${BASH_SOURCE[0]}")
@@ -32,7 +32,7 @@ DAOS_AZ_START_SCRIPT_ENV_FILE="${DAOS_VM_FILES_DIR}/${DAOS_VM_ENTRY_SCRIPT%.*}.e
 
 create_start_script_env_file() {
   log.info "Creating .env file for cloud-init start script: ${DAOS_AZ_START_SCRIPT_ENV_FILE}"
-  cat >"${start_script_env_file}" <<EOF
+  cat >"${DAOS_AZ_START_SCRIPT_ENV_FILE}" <<EOF
 DAOS_VM_BASE_NAME="${DAOS_VM_BASE_NAME}"
 DAOS_AZ_clientCount=$DAOS_AZ_clientCount
 EOF
@@ -42,17 +42,13 @@ create_cloud_init_script() {
   local ci_script="cloudinit_$(date +"%Y-%m-%d_%H-%M-%S").sh"
   makeself --nocomp --nocrc --nomd5 --base64 "${DAOS_VM_FILES_DIR}" "${ci_script}" "Cloudinit_script" "./${DAOS_VM_ENTRY_SCRIPT}"
   sed -i '1d;4d' "${ci_script}"
-  echo "[concat('#!/bin/bash" >${ci_script}.str
-  echo -n "set --'," >>${ci_script}.str
+  echo "[concat('#!/bin/bash" >"${ci_script}.str"
+  echo -n "set --'," >>"${ci_script}.str"
 
-  while test $# -gt 0; do
-    echo -n "' \"',parameters('$1'),'\"'," >>${ci_script}.str
-    shift
-  done
-  echo "'" >>${ci_script}.str
-  echo -n "','" >>${ci_script}.str
-  sed "s/'/''/g" ${ci_script} >>${ci_script}.str
-  echo -n "')]" >>${ci_script}.str
+  echo "'" >>"${ci_script}.str"
+  echo -n "','" >>"${ci_script}.str"
+  sed "s/'/''/g" ${ci_script} >>"${ci_script}.str"
+  echo -n "')]" >>"${ci_script}.str"
   local arm_src_file_path="${ARM_DIR}/${DAOS_AZ_ARM_SRC_TEMPLATE}"
   local arm_dest_file_path="${ARM_DIR}/${DAOS_AZ_ARM_DEST_TEMPLATE}"
   log.debug "arm_src_file_path=${arm_src_file_path}"

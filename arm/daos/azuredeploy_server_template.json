@@ -42,14 +42,12 @@
       }
     },
     "daosAdminImageName": {
-      "defaultValue": "azure-daos-alma8-20230613033522",
       "type": "String",
       "metadata": {
         "description": "The name of the disk image for the DAOS admin VM"
       }
     },
     "daosServerImageName": {
-      "defaultValue": "azure-daos-alma8-20230613033522",
       "type": "String",
       "metadata": {
         "description": "The name of the disk image for the DAOS server VM"
