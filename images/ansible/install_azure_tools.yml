@@ -1,0 +1,60 @@
+---
+- name: Install DAOS
+  hosts: 127.0.0.1
+  connection: local
+  become: true
+
+  tasks:
+    - name: Install the Microsoft repository key
+      ansible.builtin.rpm_key:
+        key: "https://packages.microsoft.com/keys/microsoft.asc"
+        state: present
+
+    - name: Install the Microsoft packages repository
+      ansible.builtin.dnf:
+        name: "https://packages.microsoft.com/config/rhel/8/packages-microsoft-prod.rpm"
+        state: present
+
+    - name: Install the Microsoft Azure CLI
+      ansible.builtin.dnf:
+        name: "azure-cli"
+        state: present
+
+    - name: Uninstall the Azure Linux Agent
+      ansible.builtin.dnf:
+        name: "WALinuxAgent"
+        state: absent
+
+    - name: Reinstall the Azure Linux Agent
+      ansible.builtin.dnf:
+        name: "WALinuxAgent"
+        state: present
+
+    - name: Configure waagent service
+      ansible.builtin.lineinfile:
+        path: /etc/waagent.conf
+        regexp: "{{ item.regexp }}"
+        line: "{{ item.line }}"
+        backup: true
+      loop:
+        - { regexp: 'Provisioning.Agent=.*',
+            line: 'Provisioning.Agent=cloud-init' }
+        - { regexp: 'Provisioning.Agent=.*',
+            line: 'Provisioning.Agent=cloud-init' }
+
+    - name: Enable the Azure Linux Agent
+      ansible.builtin.service:
+        name: "waagent"
+        state: started
+        enabled: yes
+
+    - name: Install azcopy
+      ansible.builtin.shell: |
+        cd /tmp
+        wget https://aka.ms/downloadazcopy-v10-linux
+        tar -xvf downloadazcopy-v10-linux
+        rm -f /usr/bin/azcopy
+        cp ./azcopy_linux_amd64_*/azcopy /usr/bin/
+        chmod 755 /usr/bin/azcopy
+        rm -f downloadazcopy-v10-linux
+        rm -rf ./azcopy_linux_amd64_*/

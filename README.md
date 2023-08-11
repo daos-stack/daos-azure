@@ -21,7 +21,26 @@ Automation scripts for deploying DAOS on Azure
 1. **Install necessary software**
    See [Prerequisites](./docs/prerequisites.md) for instructions.
 
-2. **Build the DAOS image**
+2. **Deploy Infrastructure Resources**
+   You will need to create many resources that make up the "infrastructure"
+   required for a DAOS Server deployment.
+
+   TODO: Create documentation for creating infrastructure resources.
+         Currently we are using a Terraform configuration in a private repo.
+
+3. **Create a `daos-azure.env` file**
+   All bash scripts will source a file named `daos-azure.env` located in the
+   root of the local clone of this repo.
+
+   To create the `daos-azure.env` file make a copy of the `daos-azure.env.example` file.
+
+   ```bash
+   cp daos-azure.env.example daos-azure.env
+   ```
+
+   Modify the variable values to contain the settings for your deployment.
+
+4. **Build the DAOS image**
 
    ```bash
    cd images
@@ -30,39 +49,25 @@ Automation scripts for deploying DAOS on Azure
 
    See [images/README.md](./images/README.md) for details.
 
-3. **Deploy DAOS Servers**
+5. **Deploy DAOS Servers**
 
    ```bash
    cd bin
-   cp daos_servers_deploy.env.example daos_servers_deploy.env
-   # Modify daos_servers_deploy.env
    ./daos_servers_deploy.sh
    ```
 
-4. **Deploy DAOS Clients**
+6. **Deploy DAOS Clients**
+
+   TODO: Still need to create ARM templates and scripts for client deployments.
+
+7. **Log into first server**
+
+   TODO: Provide instructions for setting up an Azure bastion and tunneling through it to the first server VM.
+
+8. **Undeploy the Servers**
 
    ```bash
    cd bin
-   cp daos_clients_deploy.env.example daos_clients_deploy.env
-   # Modify daos_clients_deploy.env
-   ./daos_clients_deploy.sh
-   ```
-
-5. **Log into first client**
-
-   TODO: Provide instructions for setting up an Azure bastion and tunneling through it to the first client VM.
-
-6. **Undeploy the Clients and Servers**
-
-   Re-use the .env files that were used for deployment.
-
-   ```bash
-   cd bin
-
-   DAOS_CLIENTS_UNDEPLOY_ENV_FILE="daos_clients_deploy.env"
-   ./daos_clients_undeploy.sh
-
-   DAOS_SERVERS_UNDEPLOY_ENV_FILE="daos_servers_deploy.env"
    ./daos_servers_undeploy.sh
    ```
 

@@ -247,6 +247,21 @@
         - daos_metrics
         - daos_daemons
 
+    - name: Create ansible group
+      ansible.builtin.group:
+        name: "ansible"
+        system: true
+        state: present
+
+    - name: Create ansible user
+      ansible.builtin.user:
+        name: "ansible"
+        shell: /bin/bash
+        groups: "ansible"
+        append: yes
+        create_home: true
+        state: present
+
     - name: Create sudoers.d files
       ansible.builtin.copy:
         content: "{{ item }} ALL=(ALL) NOPASSWD: ALL"
@@ -258,6 +273,7 @@
         - daos_admin
         - daos_agent
         - daos_server
+        - ansible
 
     - name: Create DAOS dirs
       ansible.builtin.file:
