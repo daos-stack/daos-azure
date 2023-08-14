@@ -2,97 +2,116 @@
 
 set -eo pipefail
 
-trap 'echo "daos_servers_deploy.sh : Unexpected error. Exiting.' ERR
+trap 'echo "${BASH_SOURCE[0]} : Unexpected error. Exiting."' ERR
 
 SCRIPT_DIR="$(realpath "$(dirname $0)")"
 SCRIPT_FILE=$(basename "${BASH_SOURCE[0]}")
-. "${SCRIPT_DIR}/_log.sh"
 
-SCRIPT_ENV_FILE="${DAOS_SERVERS_DEPLOY_ENV_FILE:="${SCRIPT_FILE%.*}.env"}"
-if [[ -f "${SCRIPT_ENV_FILE}" ]]; then
-  log.info "${SCRIPT_ENV_FILE} exists. Loading environment variables from the file."
-  . "${SCRIPT_ENV_FILE}"
-fi
+DEFAULT_ENV_FILE="${SCRIPT_DIR}/../daos-azure.env"
+DAOS_AZ_ENV_FILE="${DAOS_AZ_ENV_FILE:="${DEFAULT_ENV_FILE}"}"
 
-ARM_DIR="$(realpath ${SCRIPT_DIR}/../arm/daos)"
+ARM_DIR="$(realpath "${SCRIPT_DIR}/../arm/daos")"
 VM_FILES_DIR="$(realpath "${SCRIPT_DIR}/../vm_files/daos_server")"
 
-DAOS_AZ_RESOURCE_PREFIX="${DAOS_AZ_RESOURCE_PREFIX:="${USER}"}"
-DAOS_AZ_RG_DEPLOYMENT_NAME="${DAOS_AZ_RG_DEPLOYMENT_NAME:="${DAOS_AZ_RESOURCE_PREFIX}-daos-cluster"}"
-DAOS_AZ_RG_NAME="${DAOS_AZ_RG_NAME:="$(az config get defaults.group -o tsv --only-show-errors | awk '{print $3}')"}"
-DAOS_AZ_ARM_SRC_TEMPLATE="${DAOS_AZ_ARM_SRC_TEMPLATE:="azuredeploy_server_template.json"}"
-DAOS_AZ_ARM_DEST_TEMPLATE="${DAOS_AZ_ARM_DEST_TEMPLATE:="azuredeploy_server.json"}"
-DAOS_AZ_IMAGE_PREFIX="${DAOS_AZ_IMAGE_PREFIX:="azure-daos-alma8"}"
-DAOS_AZ_ADMIN_RSA_PUBLIC_KEY_FILE="${DAOS_AZ_ADMIN_RSA_PUBLIC_KEY_FILE:="${HOME}/.ssh/id_rsa.pub"}"
-DAOS_AZ_ADMIN_RSA_PUBLIC_KEY_DATA="${DAOS_AZ_ADMIN_RSA_PUBLIC_KEY_DATA:="$(cat "${DAOS_AZ_ADMIN_RSA_PUBLIC_KEY_FILE}")"}"
-DAOS_VM_BASE_NAME="${DAOS_VM_BASE_NAME:="${DAOS_AZ_RESOURCE_PREFIX}-daos-server"}"
-DAOS_AZ_SERVERS_GEN_ARM_ENV_FILE="${DAOS_AZ_SERVERS_GEN_ARM_ENV_FILE:="${SCRIPT_DIR}/daos_servers_gen_arm.env"}"
+# Logging functions
+source "${SCRIPT_DIR}/_log.sh"
 
-# Arm Template Parameter Values
-DAOS_AZ_resourcePrefix="${DAOS_AZ_resourcePrefix:="${DAOS_AZ_RESOURCE_PREFIX}"}"
-DAOS_AZ_existingVnetResourceGroupName="${DAOS_AZ_existingVnetResourceGroupName:="${DAOS_AZ_RG_NAME}"}"
-DAOS_AZ_existingVnetName="${DAOS_AZ_existingVnetName:="${DAOS_AZ_resourcePrefix}-vnet"}"
-DAOS_AZ_existingSubnetName="${DAOS_AZ_existingSubnetName:="${DAOS_AZ_resourcePrefix}-sn"}"
-DAOS_AZ_daosAdminSku="${DAOS_AZ_daosAdminSku:="Standard_L8s_v3"}"
-DAOS_AZ_daosAdminImageName="${DAOS_AZ_daosAdminImageName:=$(az image list -g "${DAOS_AZ_RG_NAME}" -o tsv | grep "${DAOS_AZ_IMAGE_PREFIX}" | awk '{print $5}' | sort | tail -1)}"
-DAOS_AZ_daosServerImageName="${DAOS_AZ_daosServerImageName:="${DAOS_AZ_daosAdminImageName}"}"
-DAOS_AZ_daosServerSku="${DAOS_AZ_daosServerSku:="Standard_L8s_v3"}"
-DAOS_AZ_adminUser="${DAOS_AZ_adminUser:="daos_admin"}"
-DAOS_AZ_serverCount="${DAOS_AZ_serverCount:=3}"
-DAOS_AZ_serverNumDisks="${DAOS_AZ_serverNumDisks:=8}"
-DAOS_AZ_serverDiskSize="${DAOS_AZ_serverDiskSize:=512}"
-DAOS_AZ_serverStorageSku="${DAOS_AZ_serverStorageSku:="Premium_LRS"}"
-DAOS_AZ_useAvailabilityZone="${DAOS_AZ_useAvailabilityZone:=true}"
-DAOS_AZ_availabilityZone="${DAOS_AZ_availabilityZone:=1}"
+source_build_env_file() {
+  local env_file="${1}"
+  if [[ -n "${env_file}" ]]; then
+    if [[ -f "${env_file}" ]]; then
+      log.debug "Sourcing ${env_file}"
+      source "${env_file}"
+      log.debug.vars
+    else
+      log.error "ERROR File not found: ${env_file}"
+      exit 1
+    fi
+  else
+    log.debug "Checking for existence of ${DAOS_AZ_ENV_FILE}"
+    if [[ -f "${DAOS_AZ_ENV_FILE}" ]]; then
+      log.debug "Sourcing ${DAOS_AZ_ENV_FILE}"
+      source "${DAOS_AZ_ENV_FILE}"
+    else
+      log.error "File not found: ${DAOS_AZ_ENV_FILE}"
+      exit 1
+    fi
+  fi
+}
 
-readarray -t daos_vars < <(compgen -A variable | grep "DAOS" | sort)
-for var in "${daos_vars[@]}"; do
-  export "$var"
-  log.debug "Exported: $var"
-done
+export_vars() {
+  readarray -t pkr_vars < <(compgen -A variable | grep "DAOS_" | sort)
+  for var in "${pkr_vars[@]}"; do
+    export "$var"
+  done
+}
 
-log.info "Generating file: ${DAOS_AZ_SERVERS_GEN_ARM_ENV_FILE}"
-cat >"${DAOS_AZ_SERVERS_GEN_ARM_ENV_FILE}" <<EOF
-DAOS_AZ_RG_NAME="${DAOS_AZ_RG_NAME}"
-DAOS_VM_COUNT=${DAOS_AZ_serverCount}
-DAOS_AZ_RESOURCE_PREFIX="${DAOS_AZ_RESOURCE_PREFIX:="${USER}"}"
-DAOS_AZ_ARM_SRC_TEMPLATE="${DAOS_AZ_ARM_SRC_TEMPLATE:="azuredeploy_server_template.json"}"
-DAOS_AZ_ARM_DEST_TEMPLATE="${DAOS_AZ_ARM_DEST_TEMPLATE:="azuredeploy_server.json"}"
-DAOS_VM_FILES_DIR="${DAOS_VM_FILES_DIR:="${VM_FILES_DIR}"}"
-DAOS_VM_ENTRY_SCRIPT="${DAOS_VM_ENTRY_SCRIPT:="daos_server_setup.sh"}"
-DAOS_VM_BASE_NAME="${DAOS_VM_BASE_NAME:="${DAOS_AZ_RESOURCE_PREFIX}-daos-server"}"
-DAOS_AZ_serverCount="${DAOS_AZ_serverCount:=1}"
-EOF
+set_vars() {
+  local res_prefix="daos"
 
-log.info "Running ${SCRIPT_DIR}/daos_servers_gen_arm.sh"
-"${SCRIPT_DIR}/daos_servers_gen_arm.sh"
+  log.debug "Setting variables"
 
-log.info "Creating group deployment: ${DAOS_AZ_RG_DEPLOYMENT_NAME}"
-az deployment group create \
-  --resource-group "${DAOS_AZ_RG_NAME}" \
-  --name "${DAOS_AZ_RG_DEPLOYMENT_NAME}" \
-  --template-file "${ARM_DIR}/${DAOS_AZ_ARM_DEST_TEMPLATE}" \
-  --parameters resourcePrefix="${DAOS_AZ_resourcePrefix}" \
-  --parameters existingVnetResourceGroupName="${DAOS_AZ_existingVnetResourceGroupName}" \
-  --parameters existingVnetName="${DAOS_AZ_existingVnetName=}" \
-  --parameters existingSubnetName="${DAOS_AZ_existingSubnetName}" \
-  --parameters daosAdminSku="${DAOS_AZ_daosAdminSku}" \
-  --parameters daosAdminImageName="${DAOS_AZ_daosAdminImageName}" \
-  --parameters daosServerImageName="${DAOS_AZ_daosServerImageName}" \
-  --parameters daosServerSku="${DAOS_AZ_daosServerSku}" \
-  --parameters adminUser="${DAOS_AZ_adminUser}" \
-  --parameters adminRsaPublicKey="${DAOS_AZ_ADMIN_RSA_PUBLIC_KEY_DATA}" \
-  --parameters serverCount="${DAOS_AZ_serverCount}" \
-  --parameters serverNumDisks="${DAOS_AZ_serverNumDisks}" \
-  --parameters serverDiskSize="${DAOS_AZ_serverDiskSize}" \
-  --parameters serverStorageSku="${DAOS_AZ_serverStorageSku}" \
-  --parameters useAvailabilityZone="${DAOS_AZ_useAvailabilityZone}" \
-  --parameters availabilityZone="${DAOS_AZ_availabilityZone}"
+  if [[ -n "${DAOS_AZ_CORE_RESOURCE_PREFIX}" ]]; then
+    res_prefix="${DAOS_AZ_CORE_RESOURCE_PREFIX}-daos"
+  fi
 
-if [[ -f "${DAOS_AZ_SERVERS_GEN_ARM_ENV_FILE}" ]]; then
-  rm -f "${DAOS_AZ_SERVERS_GEN_ARM_ENV_FILE}"
-fi
+  DAOS_AZ_ARM_SVR_GROUP_DEPLOYMENT_NAME="${DAOS_AZ_ARM_SVR_GROUP_DEPLOYMENT_NAME:="${res_prefix}-server-deployment"}"
+  DAOS_AZ_ARM_SVR_SRC_TEMPLATE="${DAOS_AZ_ARM_SRC_TEMPLATE:="azuredeploy_server_template.json"}"
+  DAOS_AZ_ARM_SVR_DEST_TEMPLATE="${DAOS_AZ_ARM_DEST_TEMPLATE:="azuredeploy_server.json"}"
+  DAOS_AZ_ARM_SVR_VMSS_NAME="${DAOS_AZ_ARM_SVR_VMSS_NAME:="${res_prefix}-server-vmss"}"
+  DAOS_AZ_SSH_ADMIN_KEY_PUB_DATA="${DAOS_AZ_SSH_ADMIN_KEY_PUB_DATA:="$(cat "${DAOS_AZ_SSH_ADMIN_KEY_PUB}")"}"
+  export_vars
+  log.debug.vars
+}
 
-if [[ -f "${ARM_DIR}/${DAOS_AZ_ARM_DEST_TEMPLATE}" ]]; then
-  rm -f "${ARM_DIR}/${DAOS_AZ_ARM_DEST_TEMPLATE}"
-fi
+generate_arm_template() {
+  # Generate a set of files that will be included in self a extracting
+  # executable file that will be run by cloud-init on the DAOS Server VMs
+  log.info "Running ${SCRIPT_DIR}/daos_servers_gen_arm.sh"
+  "${SCRIPT_DIR}/daos_servers_gen_arm.sh"
+}
+
+deploy() {
+  log.info "Creating group deployment: ${DAOS_AZ_ARM_SVR_GROUP_DEPLOYMENT_NAME}"
+  az deployment group create \
+    --resource-group "${DAOS_AZ_CORE_RG_NAME}" \
+    --name "${DAOS_AZ_ARM_SVR_GROUP_DEPLOYMENT_NAME}" \
+    --template-file "${ARM_DIR}/${DAOS_AZ_ARM_SVR_DEST_TEMPLATE}" \
+    --parameters resourcePrefix="${DAOS_AZ_CORE_RESOURCE_PREFIX}" \
+    --parameters existingVnetResourceGroupName="${DAOS_AZ_CORE_RG_NAME}" \
+    --parameters existingVnetName="${DAOS_AZ_NET_VNET_NAME}" \
+    --parameters existingSubnetName="${DAOS_AZ_NET_SUBNET_NAME}" \
+    --parameters daosServerImageId="${DAOS_AZ_ARM_SVR_IMG_ID}" \
+    --parameters daosServerSku="${DAOS_AZ_ARM_SVR_SKU}" \
+    --parameters adminUser="${DAOS_AZ_ARM_ADMIN_USER}" \
+    --parameters adminRsaPublicKey="${DAOS_AZ_SSH_ADMIN_KEY_PUB_DATA}" \
+    --parameters vmScalesetName="${DAOS_AZ_ARM_SVR_VMSS_NAME}" \
+    --parameters serverCount="${DAOS_AZ_ARM_SVR_COUNT}" \
+    --parameters serverDiskCount="${DAOS_AZ_ARM_SVR_DISK_COUNT}" \
+    --parameters serverDiskSize="${DAOS_AZ_ARM_SVR_DISK_SIZE}" \
+    --parameters serverStorageSku="${DAOS_AZ_ARM_SVR_DISK_STORAGE_SKU}" \
+    --parameters useAvailabilityZone="${DAOS_AZ_ARM_SVR_USE_AVAIL_ZONE}" \
+    --parameters availabilityZone="${DAOS_AZ_ARM_SVR_AVAIL_ZONE}" \
+    --parameters userAssignedManagedIdentityName="${DAOS_AZ_ARM_UAMID_NAME}"
+
+}
+
+cleanup() {
+  if [[ -f "${SCRIPT_DIR}/daos_servers_gen_arm.env" ]]; then
+    rm -f "${SCRIPT_DIR}/daos_servers_gen_arm.env"
+  fi
+
+  if [[ -f "${ARM_DIR}/${DAOS_AZ_ARM_DEST_TEMPLATE}" ]]; then
+    rm -f "${ARM_DIR}/${DAOS_AZ_ARM_DEST_TEMPLATE}"
+  fi
+}
+
+main() {
+  source_build_env_file "$@"
+  set_vars
+  generate_arm_template
+  deploy
+  cleanup
+}
+
+main "$@"

@@ -9,9 +9,51 @@ This directory contains files necessary for building DAOS images using Packer an
 
 If you have not done so yet, please complete the steps in the [Prequisites](../docs/prerequisites.md) document.
 
+## Accept Legal Terms of Base Image
+
+The DAOS image is based on the Alma Linux 8 marketplace image.
+
+In order to use this image you must accept the legal terms before running `packer`.
+
+To accept the legal terms run
+
+```bash
+az vm image accept-terms --urn almalinux:almalinux:8-gen2:8.7.2022122801
+```
+
+## Create Shared Image Gallery
+
+The DAOS image will be published in an image gallery.
+
+If you do not already have an image gallery you will need to create one.
+
+To create an image gallery
+
+```bash
+az sig create --resource-group "<resource_group>" --gallery-name daos_image_gallery
+```
+
+Underscores are used in the name because gallery names may not contain the -  character.
+
+## Image Definition
+
+Create an image definition within the image gallery.
+
+az sig image-definition create \
+   --resource-group "<resource_group>" \
+   --gallery-name daos_image_gallery \
+   --gallery-image-definition "daos-almalinux8" \
+   --publisher daos \
+   --offer daos \
+   --sku 24 \
+   --os-type Linux \
+   --os-state specialized
+
 ## Building DAOS images
 
-To build the images with the default settings run:
+Ensure that the variables in the `daos-azure.env` file contain the proper values for your subscription (account), resource group, service principal, image gallery, image definition, etc.
+
+To build the DAOS image run:
 
 ```bash
 cd images
@@ -20,19 +62,6 @@ cd images
 
 ## Customizing the build
 
-The `build.sh` script uses environment variables that can be overriden to install different versions of DAOS on different distros or distro versions. This allows images to be built as part of a CI workflow.
+The `build.sh` script uses the environment variables defined in the `daos-azure.env` file.
 
-The `build.env.example` file contains a list of environment variables that can be overriden to customize the image build.
-
-The variables either need to be exported prior to running `build.sh` or they can exist in a file. The path to the file can be passed as an argument to `build.sh` which will source the file before performing the build.
-
-You can copy the `build.env.example` file, make any necessary  changes, then pass the path of the `.env` file as an argument to `build.sh`.
-
-For example:
-
-```bash
-cd images
-cp build.env.example build.env
-# Make changes to build.env
-./build.sh build.env
-```
+To create the `daos-azure.env` file make a copy of `daos-azure.env.example` and set the variable values that are appropriate for your deployment.

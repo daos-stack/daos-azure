@@ -2,33 +2,28 @@
 
 set -eo pipefail
 
-trap 'echo "daos_servers_undeploy.sh : Unexpected error. Exiting.' ERR
+trap 'echo "${BASH_SOURCE[0]} : Error occured. Exiting..."' ERR
 
 SCRIPT_DIR="$(realpath "$(dirname $0)")"
 SCRIPT_FILE=$(basename "${BASH_SOURCE[0]}")
-. "${SCRIPT_DIR}/_log.sh"
 
-SCRIPT_ENV_FILE="${DAOS_SERVERS_UNDEPLOY_ENV_FILE:="${SCRIPT_FILE%.*}.env"}"
-if [[ -f "${SCRIPT_ENV_FILE}" ]]; then
-  log.info "${SCRIPT_ENV_FILE} exists. Loading environment variables from the file."
-  . "${SCRIPT_ENV_FILE}"
-fi
+DEFAULT_ENV_FILE="${SCRIPT_DIR}/../daos-azure.env"
+DAOS_AZ_ENV_FILE="${DAOS_AZ_ENV_FILE:="${DEFAULT_ENV_FILE}"}"
 
-DAOS_AZ_RESOURCE_PREFIX="${DAOS_AZ_RESOURCE_PREFIX:="${USER}"}"
-DAOS_AZ_RG_DEPLOYMENT_NAME="${DAOS_AZ_RG_DEPLOYMENT_NAME:="${DAOS_AZ_RESOURCE_PREFIX}-daos-cluster"}"
-DAOS_AZ_RG_NAME="${DAOS_AZ_RG_NAME:="$(az config get defaults.group -o tsv --only-show-errors | awk '{print $3}')"}"
+source "${DAOS_AZ_ENV_FILE}"
+source "${SCRIPT_DIR}/_log.sh"
 
-log.debug.vars "DAOS"
+log.debug.vars
 
-log.info "Deployment '${DAOS_AZ_RG_DEPLOYMENT_NAME}'"
+log.info "Deployment '${DAOS_AZ_ARM_SVR_GROUP_DEPLOYMENT_NAME}'"
 az deployment group show \
-  -g "${DAOS_AZ_RG_NAME}" \
-  -n "${DAOS_AZ_RG_DEPLOYMENT_NAME}"
+  -g "${DAOS_AZ_CORE_RG_NAME}" \
+  -n "${DAOS_AZ_ARM_SVR_GROUP_DEPLOYMENT_NAME}"
+echo
 
-log.info "Deleting resources"
 for i in $(az deployment group show \
-  -g "${DAOS_AZ_RG_NAME}" \
-  -n "${DAOS_AZ_RG_DEPLOYMENT_NAME}" \
+  -g "${DAOS_AZ_CORE_RG_NAME}" \
+  -n "${DAOS_AZ_ARM_SVR_GROUP_DEPLOYMENT_NAME}" \
   --query "properties.outputs.resourceIds.value[]" \
   -o tsv); do
 
@@ -36,5 +31,7 @@ for i in $(az deployment group show \
   az resource delete --ids "${i}"
 done
 
-log.info "Deleting Deployment: ${DAOS_AZ_RG_DEPLOYMENT_NAME}"
-az deployment group delete -g "${DAOS_AZ_RG_NAME}" -n "${DAOS_AZ_RG_DEPLOYMENT_NAME}"
+log.info "Deleting Deployment: ${DAOS_AZ_ARM_SVR_GROUP_DEPLOYMENT_NAME}"
+az group deployment delete \
+  -g "${DAOS_AZ_CORE_RG_NAME}" \
+  -n "${DAOS_AZ_ARM_SVR_GROUP_DEPLOYMENT_NAME}"

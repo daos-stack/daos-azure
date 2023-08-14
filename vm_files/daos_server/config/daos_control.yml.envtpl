@@ -1,6 +1,0 @@
-name: daos_server
-port: 10001
-hostlist: [${DAOS_AP_LIST}]
-
-transport_config:
-  allow_insecure: true

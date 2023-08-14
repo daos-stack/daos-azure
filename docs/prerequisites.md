@@ -45,24 +45,22 @@ az login --scope https://vault.azure.net/.default
     az group list
     ```
 
-    If you do not have any resource groups yet, create one. You should also create a storage account. The name of your storage account must be unique across Azure. To ensure a unique name we will add a timestamp to the name in the example below.
+    If you do not have any resource groups yet, you will need to [create one](https://learn.microsoft.com/en-us/cli/azure/group?view=azure-cli-latest#az-group-create).
 
     ```bash
     az group create --name "daos-rg" --location "westus3"
-
-    az storage create --name "daos$(date "+%Y%m%d%H%M%S")" --location "westus3"
-    ```
-
-    Set the default resource group for the Azure CLI
-
-    ```bash
-    az config set defaults.location=westus3 defaults.group=daos-rg
     ```
 
     Disable warnings about experimental commands
 
     ```bash
     az config set core.only_show_errors=yes
+    ```
+
+    Set the default resource group for the Azure CLI
+
+    ```bash
+    az config set defaults.location=westus3 defaults.group=daos-rg
     ```
 
 ### jq and makeself
@@ -87,8 +85,54 @@ MacOS with Homebrew
 brew install jq makeself
 ```
 
+## Create Required Resources
+
+### Storage Account
+
+A [Storage Account](https://learn.microsoft.com/en-us/azure/storage/common/storage-account-overview) is required for a DAOS deployment.
+
+View your storage accounts
+
+```bash
+az storage account list
+```
+
+If you do not have a storage account, you will need to [create one](https://learn.microsoft.com/en-us/cli/azure/group?view=azure-cli-latest#az-group-create).
+
+```bash
+az storage create --name "daos$(date "+%Y%m%d%H%M%S")" --location "westus3"
+```
+
+### Application Registration and Service Principal
+
+Packer authenticates with Azure using a service principal. An Azure service principal is a security identity that you can use with apps, services, and automation tools like Packer. You control and define the permissions as to what operations the service principal can perform in Azure.
+
+See [Application and service principal objects in Azure Active Directory](https://learn.microsoft.com/en-us/azure/active-directory/develop/app-objects-and-service-principals?tabs=browser) for more information.
+
+List your Application Registrations
+
+```bash
+az ad app list --show-mine
+```
+
+If there are none, you will need to create one.
+
+```bash
+AZ_SUBSCRIPTION_NAME="<your subscription name>"
+AZ_SUBSCRIPTION_ID=$(az account list --query "[?name=='${AZ_SUBSCRIPTION_NAME}'].id" -o tsv)
+
+az ad sp create-for-rbac \
+  --display-name "daos-packer" \
+  --role Contributor \
+  --scopes "/subscriptions/${AZ_SUBSCRIPTION_ID}" \
+  --query "{ client_id: appId, client_secret: password, tenant_id: tenant }"
+```
+
+Save the Client_id, Client_secret and Tenant_id values as you will need to set environment variables with these values before running `packer`.
+
+
 ## Next Steps
 
-Before you can deploy DAOS you will need to build an image.
+Before you can deploy DAOS you will need to build a VM image that has DAOS pre-installed.
 
-See [images/README.md](../images/README.md)
+For instructions see [images/README.md](../images/README.md)

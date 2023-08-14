@@ -11,17 +11,71 @@ variable "subscription_id" {
   type = string
 }
 
-variable "resource_group" {
+variable "resource_group_name" {
   type = string
 }
 
-variable "location" {
+variable "client_id" {
   type = string
+}
+
+variable "client_secret" {
+  type = string
+}
+
+variable "tenant_id" {
+  type = string
+}
+
+variable "vm_size" {
+  type    = string
+  default = "Standard_L8s_v3"
 }
 
 variable "use_azure_cli_auth" {
   type    = bool
-  default = true
+  default = false
+}
+
+variable "allowed_inbound_ip_addresses" {
+  type = list(string)
+}
+
+variable "image_offer" {
+  type = string
+}
+
+variable "image_publisher" {
+  type = string
+}
+
+variable "image_sku" {
+  type = string
+}
+
+variable "image_version" {
+  type = string
+}
+
+variable "daos_image_gallery_name" {
+  type = string
+}
+
+variable "daos_image_gallery_location" {
+  type = string
+}
+
+variable "daos_image_publisher" {
+  type    = string
+  default = "daos"
+}
+
+variable "daos_image_name" {
+  type = string
+}
+
+variable "daos_image_version_prefix" {
+  type = string
 }
 
 variable "daos_git_repo_url" {
@@ -45,7 +99,7 @@ variable "daos_utils_script" {
 }
 
 variable "daos_apply_patches" {
-  default = true
+  default = false
   type    = bool
 }
 
@@ -79,42 +133,6 @@ variable "daos_python_version" {
   type    = string
 }
 
-variable "daos_version" {
-  type = string
-}
-
-variable "daos_repo_base_url" {
-  type = string
-}
-
-variable "daos_packages_repo_file" {
-  type = string
-}
-
-variable "daos_install_type" {
-  type = string
-}
-
-variable "image_name_prefix" {
-  type = string
-}
-
-variable "image_offer" {
-  type = string
-}
-
-variable "image_publisher" {
-  type = string
-}
-
-variable "image_sku" {
-  type = string
-}
-
-variable "image_version" {
-  type = string
-}
-
 variable "ansible_playbook" {
   type    = string
   default = "install_daos_from_source.yml"
@@ -122,37 +140,57 @@ variable "ansible_playbook" {
 
 variable "nr_hugepages" {
   type    = number
-  default = 4164
+  default = 8096
 }
 
 locals {
-  timestamp         = regex_replace(timestamp(), "[- TZ:]", "")
-  image_name        = "${var.image_name_prefix}-${local.timestamp}"
-  scripts_path      = "${path.root}/scripts"
-  patches_path      = "${path.root}/daos_patches"
-  config_files_path = "${path.root}/daos_config"
+  managed_image_version = "${var.daos_image_version_prefix}.${formatdate("YYYYMMDD", timestamp())}"
+  scripts_path          = "${path.root}/scripts"
+  patches_path          = "${path.root}/daos_patches"
+  config_files_path     = "${path.root}/daos_config"
 }
 
 source "azure-arm" "daos" {
-  subscription_id           = "${var.subscription_id}"
-  build_resource_group_name = "${var.resource_group}"
-  #location                  = "${var.location}"
-  image_offer        = "${var.image_offer}"
-  image_publisher    = "${var.image_publisher}"
-  image_sku          = "${var.image_sku}"
-  image_version      = "${var.image_version}"
-  managed_image_name = "${local.image_name}"
+  subscription_id           = var.subscription_id
+  build_resource_group_name = var.resource_group_name
 
-  managed_image_resource_group_name = "${var.resource_group}"
-  os_type                           = "Linux"
-  ssh_pty                           = "true"
-  use_azure_cli_auth                = "${var.use_azure_cli_auth}"
-  vm_size                           = "Standard_L8s_v3"
+  client_id     = var.client_id
+  client_secret = var.client_secret
+  tenant_id     = var.tenant_id
+
+  vm_size            = var.vm_size
+  os_type            = "Linux"
+  communicator       = "ssh"
+  ssh_pty            = "true"
+  use_azure_cli_auth = var.use_azure_cli_auth
+
+  allowed_inbound_ip_addresses = var.allowed_inbound_ip_addresses
+
+  image_offer     = var.image_offer
+  image_publisher = var.image_publisher
+  image_sku       = var.image_sku
+  image_version   = var.image_version
+
   plan_info {
-    plan_name      = "${var.image_sku}"
-    plan_product   = "${var.image_offer}"
-    plan_publisher = "${var.image_publisher}"
+    plan_name      = var.image_sku
+    plan_product   = var.image_offer
+    plan_publisher = var.image_publisher
   }
+
+  shared_image_gallery_destination {
+    subscription   = var.subscription_id
+    resource_group = var.resource_group_name
+    gallery_name   = var.daos_image_gallery_name
+    image_name     = var.daos_image_name
+    image_version  = local.managed_image_version
+    replication_regions = [
+      var.daos_image_gallery_location
+    ]
+    storage_account_type = "Standard_LRS"
+  }
+
+  managed_image_resource_group_name = var.resource_group_name
+  managed_image_name                = var.daos_image_name
 }
 
 build {
@@ -161,6 +199,11 @@ build {
   provisioner "shell" {
     execute_command = "echo 'packer' | sudo -S env {{ .Vars }} {{ .Path }}"
     script          = "${local.scripts_path}/bootstrap.sh"
+  }
+
+  provisioner "ansible-local" {
+    playbook_file   = "./ansible/install_azure_tools.yml"
+    extra_arguments = ["-b"]
   }
 
   provisioner "file" {
@@ -174,8 +217,8 @@ build {
   }
 
   provisioner "ansible-local" {
-    playbook_file = "./ansible/tune.yml"
-    galaxy_file   = "./ansible/requirements.yml"
+    playbook_file   = "./ansible/tune.yml"
+    galaxy_file     = "./ansible/requirements.yml"
     extra_arguments = ["-b"]
   }
 

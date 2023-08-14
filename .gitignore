@@ -1,5 +1,23 @@
+# DAOS
+daos-azure.env*
+!daos-azure.env.example
+
 # Packer
 *.pkrvars.hcl
+*.pem
+
+# Terraform
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+*.tfvars
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
