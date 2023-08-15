@@ -282,6 +282,8 @@ create_configs() {
 
   log.info "Creating /etc/daos/daos_server.yml"
   envsubst <"${SCRIPT_DIR}/daos_server.yml" >"/etc/daos/daos_server.yml"
+
+  mkdir -p /tmp/daos_server
 }
 
 start_daos_server_service() {
