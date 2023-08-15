@@ -34,11 +34,9 @@ engines:
   log_mask: ${DAOS_AZ_CFG_CONTROL_LOG_MASK}
   log_file: /var/daos/daos_engine.0.log
   env_vars:
-    - FI_OFI_RXM_DEF_TCP_WAIT_OBJ=pollfd
-    - DTX_AGG_THD_CNT=16777216
-    - DTX_AGG_THD_AGE=700
-    - FI_SOCKETS_MAX_CONN_RETRY=1
-    - FI_SOCKETS_CONN_TIMEOUT=2000
+    - DAOS_MD_CAP=1024
+    - CRT_TIMEOUT=60
+    - CRT_CREDIT_EP_CTX=0
 
   storage:
   -
@@ -48,3 +46,7 @@ engines:
   -
     class: nvme
     bdev_list: ${DAOS_AZ_CFG_BDEV}
+    bdev_roles: ['data', 'meta', 'wal']
+
+control_metadata:
+  path: /tmp/daos_server
