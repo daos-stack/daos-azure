@@ -8,7 +8,7 @@ set -eo pipefail
 
 mkdir -p /var/log/daos
 exec 3>&1
-exec > >(tee /var/log/daos/daos_server_setup.log) 2>&1
+exec > >(tee /var/log/daos/daos_client_setup.log) 2>&1
 
 trap 'error_handler' ERR
 
@@ -28,7 +28,7 @@ load_env() {
     # shellcheck disable=SC1090
     source "${env_file}"
     DAOS_ANSIBLE_COLL_URL="${DAOS_ANSIBLE_COLL_URL:="git+https://github.com/daos-stack/ansible-collection-daos.git"}"
-    DAOS_ANSIBLE_PLAYBOOK="${DAOS_ANSIBLE_PLAYBOOK:="daos_stack.daos.azure.daos_server"}"
+    DAOS_ANSIBLE_PLAYBOOK="${DAOS_ANSIBLE_PLAYBOOK:="daos_stack.daos.azure.daos_client"}"
   else
     echo "ERROR: File not found: '${env_file}'. Exiting..."
     exit 1
@@ -47,11 +47,12 @@ install_ansible() {
     echo 'export ANSIBLE_PYTHON_INTERPRETER=/root/.venv/bin/python3' >> /root/.bashrc
   fi
 
-# shellcheck disable=SC1090,SC1091
+  # shellcheck disable=SC1090,SC1091
   source /root/.venv/bin/activate
   pip install pip --upgrade
 
   export ANSIBLE_PYTHON_INTERPRETER=/root/.venv/bin/python3
+
   ansible-galaxy collection install "azure.azcollection"
   pip install -r ~/.ansible/collections/ansible_collections/azure/azcollection/requirements-azure.txt
 
@@ -67,7 +68,8 @@ install_daos() {
       group_name: \"${DAOS_AZ_CORE_RG_NAME}\",
       location: \"${DAOS_AZ_CORE_LOCATION}\",
       vmss_name: \"${DAOS_AZ_ARM_SERVER_VMSS_NAME}\",
-      vault_name: \"${DAOS_AZ_ARM_KEY_VAULT_NAME}\"
+      vault_name: \"${DAOS_AZ_ARM_KEY_VAULT_NAME}\",
+      server_host_list: ${DAOS_AZ_SERVER_HOST_LIST}
     }"
 }
 

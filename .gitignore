@@ -1,6 +1,8 @@
 # DAOS
-daos-azure.env*
 !daos-azure.env.example
+bin/.*_accepted
+bin/cloudinit_*.sh
+arm/
 
 # Packer
 *.pkrvars.hcl
@@ -123,13 +125,16 @@ celerybeat.pid
 *.sage.py
 
 # Environments
-.env
+*.env
+*.env*
+.env*
 .venv
 env/
 venv/
 ENV/
 env.bak/
 venv.bak/
+.envrc
 
 # Spyder project settings
 .spyderproject
@@ -148,3 +153,9 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+
+# misc
+/scratch
+.old
+.tmp
