@@ -3,7 +3,7 @@
 ### Infrastructure Resources
 
 When deploying DAOS servers and clients using the scripts in this repo it is
-assumed that you have deployed an existing set of *infrastructure* resources.
+assumed that you have already deployed an existing set of *infrastructure* resources.
 
 The Bicep templates for DAOS servers and clients only define a Virtual
 Machine Scale Set for the VMs. Other necessary resources such as VNets, Subnets,

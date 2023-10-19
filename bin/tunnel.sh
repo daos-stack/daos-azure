@@ -119,12 +119,13 @@ delete_ssh_config() {
 
 create_tunnel() {
   local existing_tunnel_pid
+  set +e
   existing_tunnel_pid=$(lsof -i "tcp:${TUNNEL_LOCAL_PORT}" | grep 'TCP localhost:down (LISTEN)' | awk '{print $2}')
   if [[ -n "${existing_tunnel_pid}" ]]; then
     log.info "A tunnel on port '${TUNNEL_LOCAL_PORT}' already exists. PID: ${existing_tunnel_pid}"
     exit 0
   fi
-
+  set -e
   log.info "Creating SSH tunnel through '${DAOS_AZ_ARM_BASTION_NAME}' bastion to '${TUNNEL_FIRST_VM_NAME}'"
 
   log.debug "

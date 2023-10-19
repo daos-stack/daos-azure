@@ -6,7 +6,11 @@ scripts in the `daos-stack/daos-azure` repo.
 ## The `daos-azure.env` file
 
 The bash scripts and Bicep files in the `daos-stack/daos-azure` repo get their parameters from a single
-environment file named `daos-azure.env` in the root of the repository.
+environment file named `daos-azure.env` in the root of the repository. The
+environment variables will also be used in cloud-init scripts on the VMs
+and by Ansible playbooks that are run by cloud-init. This means that if you
+want to make changes to your deployment, most likely you will do so by changing
+the values of the environment variables in the `daos-azure.env` file.
 
 The bash scripts in the `bin` directory take a `-e | --env-file` option
 to specify the path to an environment file. This allows multiple `.env` files
@@ -93,19 +97,25 @@ The <var_name> portion can be multiple words separated by underscores.
 Scripts in this repo use the following convention for setting variable values.
 
 ```bash
-VAR="${VAR:-${PREFIX:+${PREFIX}-}foo}"
+VAR="${VAR:=${PREFIX:+${PREFIX}-}foo}"
+```
+
+Another way to write this would be
+
+```bash
+: "${VAR:=${PREFIX:+${PREFIX}-}foo}"
 ```
 
 Let's break it down.
 
-**`${VAR:-foo}`**
+**`${VAR:=foo}`**
 
 This syntax is saying "if VAR is unset or null, replace it with foo".
 
 So if VAR has been previously set to something, it will retain its value; otherwise,
 it gets the value foo.
 
-Sometimes you will see `${VAR:=foo}` which is a slight variation.
+Sometimes you will see `${VAR:-foo}` which is a slight variation.
 
 The ':-' operator will return foo if VAR is unset or null but it won't actually
 set the VAR value to foo.
@@ -122,7 +132,7 @@ Combining the above two: The expression ${PREFIX:+${PREFIX}-}foo is evaluated
 first. If PREFIX is set and not null, this expression will evaluate to
 ${PREFIX}-foo. If PREFIX is unset or null, it will evaluate to foo.
 
-**`VAR="${VAR:-${PREFIX:+${PREFIX}-}foo}`**
+**`VAR="${VAR:=${PREFIX:+${PREFIX}-}foo}`**
 
  This is saying "if VAR is unset or null, set it to the result of the expression
  ${PREFIX:+${PREFIX}-}foo".

@@ -7,13 +7,25 @@
 
 ## Quickstart
 
-These quickstart steps assume you will use the `bin/infrastructure.sh` script
-to deploy the required *[Infrastructure](infrastructure.md)* resources (VNet, Subnet, Network
-Security Group, etc.).
+The following instructions describe how to deploy a DAOS
+cluster using the default settings.
 
-It is also assumed that you will use all default settings.
+The cluster will consist of 3 DAOS server VMs and 3 DAOS client VMs. The
+server and client VMs both use the [Standard_L8s_v3](https://learn.microsoft.com/en-us/azure/virtual-machines/lsv3-series) SKU.
 
-1. **Clone the repo**
+The first client node will also be used as an admin node.
+
+In these instructions the `bin/infrastructure.sh` script will be used
+to deploy all required *[Infrastructure](infrastructure.md)* resources
+(VNet, Subnet, Network Security Group, etc.).
+
+1. **Prerequisites**
+
+   Follow the instructions in the [Prerequisites](prerequisites.md) document
+   to ensure that the required software is installed on your system and
+   that you have configured the Azure CLI.
+
+2. **Clone the daos-azure repo**
 
    ```bash
    git clone https://github.com/daos-stack/daos-azure.git
@@ -21,7 +33,7 @@ It is also assumed that you will use all default settings.
    export DAOS_AZ_REPO_HOME="$(pwd)"
    ```
 
-2. **Create a `daos-azure.env` file**
+3. **Create a `daos-azure.env` file**
 
    Make a copy of the `daos-azure.env.example` file.
 
@@ -42,23 +54,24 @@ It is also assumed that you will use all default settings.
 
    See [Environment Variables](env_vars.md) for more information about the `daos-azure.env` file.
 
-3. **Deploy **infrastructure** resources**
+4. **Deploy **infrastructure** resources (optional)**
 
    ```bash
    cd "${DAOS_AZ_REPO_HOME}/bin"
    ./infrastructure.sh --deploy
    ```
 
-   The first time you run the script you will be prompted to accept the
+   The first time the script runs it prompts to accept the
    AlmaLinux License Agreement.  The DAOS server and client VMs
    use the free AlmaLinux 8 image. To use this image you must accept
    the license agreement.
 
-   It can take up to 20 minutes for the deployment to finish.
+   It can take up to 20 minutes for the deployment to finish. The majority of
+   the time is spent on setting up the Azure Bastion.
 
    Wait for the deployment to finish before going to the next step.
 
-4. **Deploy DAOS servers**
+5. **Deploy DAOS servers**
 
    ```bash
    ./daos_servers.sh --deploy
@@ -75,19 +88,27 @@ It is also assumed that you will use all default settings.
    clients before the servers are up, you may have to restart
    the `daos_agent` on the client VMs after they are deployed.
 
-5. **Deploy DAOS clients**
+6. **Deploy DAOS clients**
 
    ```bash
    ./daos_clients.sh --deploy
    ```
    This will deploy a Virtual Machine Scale Set with 3 DAOS client VMs.
 
-6. **Create an SSH tunnel**
+7. **Create an SSH tunnel**
 
    To log into the VMs you need to set up an SSH tunnel to the first
    client VM.
 
-   This will allow you to use `ssh` in a terminal to log into the VMs.
+   This will allow you to use `ssh` in a terminal on your system to log
+   into the VMs.
+
+   ```
+   [Your Machine] ---SSH---> [Azure Bastion] ---SSH---> [Azure VM]
+         ||                        ||                       ||
+     (localhost)              (Bastion IP)            (VM Private IP)
+        :2022                     :22                      :22
+   ```
 
    ```bash
    ./tunnel.sh --create --configure-ssh
@@ -111,7 +132,7 @@ It is also assumed that you will use all default settings.
    will need to change the value of the `TUNNEL_LOCAL_PORT` variable in
    the `tunnel.sh` script.
 
-7. Log into the first client VM
+8. **Log into the first client VM**
 
    ```bash
    ssh daos-client-000000
@@ -123,7 +144,7 @@ It is also assumed that you will use all default settings.
    their default values, the name of the client VMs may be different.
    The `tunnel.sh` script will print the name of the first client VM.
 
-8. Check the status of the DAOS storage system
+9. **Check the DAOS storage system**
 
    ```bash
    # Show the status of the servers
@@ -140,30 +161,30 @@ It is also assumed that you will use all default settings.
    If you still encounter issues, refer to the
    [Troubleshooting Guide](troubleshooting.md) for tips.
 
-9. Create a [DAOS container](https://docs.daos.io/v2.4/user/container/) and mount it
+10. **Create and mount [DAOS container](https://docs.daos.io/v2.4/user/container/)**
 
-   ```
-   DAOS_POOL_NAME=pool1
-   DAOS_CONTAINER_NAME=cont1
-   DAOS_CONTAINER_MOUNT_DIR=~/daos/$DAOS_CONTAINER_NAME
+    ```
+    DAOS_POOL_NAME=pool1
+    DAOS_CONTAINER_NAME=cont1
+    DAOS_CONTAINER_MOUNT_DIR=~/daos/$DAOS_CONTAINER_NAME
 
-   # Create DAOS container
-   daos container create --type=POSIX --properties rd_fac:1 $DAOS_POOL_NAME $DAOS_CONTAINER_NAME
+    # Create DAOS container
+    daos container create --type=POSIX --properties rd_fac:1 $DAOS_POOL_NAME $DAOS_CONTAINER_NAME
 
-   # Create mount point
-   mkdir -p $DAOS_CONTAINER_MOUNT_DIR
+    # Create mount point
+    mkdir -p $DAOS_CONTAINER_MOUNT_DIR
 
-   # Mount
-   dfuse --singlethread \
-   --pool=$DAOS_POOL_NAME \
-   --container=$DAOS_CONTAINER_NAME \
-   --mountpoint=$DAOS_CONTAINER_MOUNT_DIR
+    # Mount
+    dfuse --singlethread \
+    --pool=$DAOS_POOL_NAME \
+    --container=$DAOS_CONTAINER_NAME \
+    --mountpoint=$DAOS_CONTAINER_MOUNT_DIR
 
-   # View mount
-   df -h -t fuse.daos
-   ```
+    # View mount
+    df -h -t fuse.daos
+    ```
 
-10. Use the storage
+11. **Use the storage**
 
     Create a 20GiB file which will be stored in the DAOS filesystem.
 
@@ -172,7 +193,7 @@ It is also assumed that you will use all default settings.
     time LD_PRELOAD=/usr/lib64/libioil.so dd if=/dev/zero of=./${HOSTNAME}_test21G.img bs=1G count=20
     ```
 
-10. Unmount the DAOS container
+12. **Unmount the DAOS container**
 
     ```bash
     cd ~/
