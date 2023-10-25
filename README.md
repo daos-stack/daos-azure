@@ -19,11 +19,9 @@ See the [Deployment Guide](docs/deployment.md).
 
 ## Support
 
-This repo is in the very early stages of development.
+Official support for the content in this repo is not available at this time.
 
-Official support is not available at this time.
-
-## Versions
+## Software Versions
 
 The content in this repo was tested with the following versions of software.
 
@@ -43,5 +41,7 @@ The content in this repo was tested with the following versions of software.
 ## License
 
 DAOS is licensed under the BSD-2-Clause Plus Patent License.
+
+The content in this repo is licensed under the same BSD-2-Clause Plus Patent License.
 
 Please see the [LICENSE](./LICENSE) & [NOTICE](./NOTICE) files for more information.
