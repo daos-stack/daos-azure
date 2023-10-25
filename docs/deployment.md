@@ -13,8 +13,6 @@ cluster using the default settings.
 The cluster will consist of 3 DAOS server VMs and 3 DAOS client VMs. The
 server and client VMs both use the [Standard_L8s_v3](https://learn.microsoft.com/en-us/azure/virtual-machines/lsv3-series) SKU.
 
-The first client node will also be used as an admin node.
-
 In these instructions the `bin/infrastructure.sh` script will be used
 to deploy all required *[Infrastructure](infrastructure.md)* resources
 (VNet, Subnet, Network Security Group, etc.).
