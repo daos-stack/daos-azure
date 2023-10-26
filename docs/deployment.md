@@ -166,7 +166,7 @@ to deploy all required *[Infrastructure](infrastructure.md)* resources
     DAOS_CONTAINER_MOUNT_DIR=~/daos/$DAOS_CONTAINER_NAME
 
     # Create DAOS container
-    daos container create --type=POSIX --properties rd_fac:1 $DAOS_POOL_NAME $DAOS_CONTAINER_NAME
+    daos container create --type=POSIX $DAOS_POOL_NAME $DAOS_CONTAINER_NAME
 
     # Create mount point
     mkdir -p $DAOS_CONTAINER_MOUNT_DIR
@@ -186,8 +186,8 @@ to deploy all required *[Infrastructure](infrastructure.md)* resources
     Create a 20GiB file which will be stored in the DAOS filesystem.
 
     ```bash
-    cd ~/daos/cont1
-    time LD_PRELOAD=/usr/lib64/libioil.so dd if=/dev/zero of=./${HOSTNAME}_test21G.img bs=1G count=20
+    cd "${DAOS_CONTAINER_MOUNT_DIR}"
+    dd if=/dev/zero of=./${HOSTNAME}_test20G.img bs=1G count=20
     ```
 
 12. **Unmount the DAOS container**
