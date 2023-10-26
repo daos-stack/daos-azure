@@ -59,11 +59,6 @@ to deploy all required *[Infrastructure](infrastructure.md)* resources
    ./infrastructure.sh --deploy
    ```
 
-   The first time the script runs it prompts to accept the
-   AlmaLinux License Agreement.  The DAOS server and client VMs
-   use the free AlmaLinux 8 image. To use this image you must accept
-   the license agreement.
-
    It can take up to 20 minutes for the deployment to finish. The majority of
    the time is spent on setting up the Azure Bastion.
 
@@ -74,8 +69,12 @@ to deploy all required *[Infrastructure](infrastructure.md)* resources
    ```bash
    ./daos_servers.sh --deploy
    ```
-
    This will deploy a Virtual Machine Scale Set with 3 DAOS server VMs.
+
+   The first time the script runs it prompts to accept the
+   AlmaLinux License Agreement.  The DAOS server and client VMs
+   use the free AlmaLinux 8 image.
+   To use this image you must accept the license agreement.
 
    After the VMs start it will take about 6 minutes for the cloud-init script to
    run an Ansible playbook on the VMs.
