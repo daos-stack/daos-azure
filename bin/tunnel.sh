@@ -11,10 +11,13 @@ SCRIPT_DIR="$(realpath "$(dirname "$0")")"
 SCRIPT_FILE=$(basename "${BASH_SOURCE[0]}")
 DEFAULT_ENV_FILE="${SCRIPT_DIR}/../daos-azure.env"
 DAOS_AZ_ENV_FILE="${DAOS_AZ_ENV_FILE:="${DEFAULT_ENV_FILE}"}"
+
 TUNNEL_ACTION=""
-TUNNEL_LOCAL_PORT=2022
-TUNNEL_SSH_CONFIG_FILE=~/.ssh/config.d/azure-tunnel
 TUNNEL_SSH_UPDATE_CONFIG="false"
+TUNNEL_LOCAL_PORT=2022
+TUNNEL_SSH_INCLUDE_DIR="${HOME}/.ssh/config.d"
+TUNNEL_SSH_CONFIG_FILE="${TUNNEL_SSH_INCLUDE_DIR}/azure-tunnel"
+
 
 # shellcheck disable=SC1091
 source "${SCRIPT_DIR}/_log.sh"
@@ -70,23 +73,21 @@ configure_ssh() {
     # shellcheck disable=SC2174
     [[ ! -d ~/.ssh ]] && mkdir -m 700 -p ~/.ssh
     # shellcheck disable=SC2174
-    [[ ! -d ~/.ssh/config.d ]] && mkdir -m 700 -p ~/.ssh/config.d
+    [[ ! -d "${TUNNEL_SSH_INCLUDE_DIR}" ]] && mkdir -m 700 -p "${TUNNEL_SSH_INCLUDE_DIR}"
     touch ~/.ssh/config && chmod 600 ~/.ssh/config
-    if ! grep -E -q 'Include\s+~/.ssh/config.d/\*' ~/.ssh/config; then
-      log.info "Adding 'Include ~/.ssh/config.d/*' to ~/.ssh/config"
-      echo 'Include ~/.ssh/config.d/*' >> ~/.ssh/config
+    if ! grep -E -q "Include\\s+${TUNNEL_SSH_INCLUDE_DIR}/\\*" ~/.ssh/config; then
+      log.info "Adding 'Include ${TUNNEL_SSH_INCLUDE_DIR}/*' to ~/.ssh/config"
+      echo "Include ${TUNNEL_SSH_INCLUDE_DIR}/*" >> ~/.ssh/config
     fi
   fi
 }
 
 create_ssh_config() {
-  mkdir -p "${HOME}/.ssh/ctrl"
+  #mkdir -p "${HOME}/.ssh/ctrl"
 
   log.info "Creating SSH config: '${TUNNEL_SSH_CONFIG_FILE}'"
 
-  # This assumes you have 'Include ~/.ssh/config.d/*' in your ~/.ssh/config file
   cat > "${TUNNEL_SSH_CONFIG_FILE}" <<EOF
-
 Host jump
     Hostname 127.0.0.1
     Port ${TUNNEL_LOCAL_PORT}
@@ -95,9 +96,9 @@ Host jump
     IdentitiesOnly yes
     User ${DAOS_AZ_ARM_ADMIN_USER}
     IdentityFile ${DAOS_AZ_SSH_ADMIN_KEY}
-    ControlPath ~/.ssh/ctrl/%r@%h:%p
-    ControlMaster auto
-    ControlPersist yes
+    # ControlPath ~/.ssh/ctrl/%r@%h:%p
+    # ControlMaster auto
+    # ControlPersist yes
 
 Host ${TUNNEL_HOSTNAME_PREFIX}*
     ProxyJump jump
@@ -149,7 +150,7 @@ create_tunnel() {
   create_ssh_config
 
   log.info "Tunnel through '${TUNNEL_FIRST_VM_NAME}' is now running on 127.0.0.1:${TUNNEL_LOCAL_PORT}"
-  log.info "To log in run: ssh ${TUNNEL_FIRST_VM_NAME}"
+  #log.info "To log in run: ssh -i -p ${TUNNEL_LOCAL_PORT} ${TUNNEL_FIRST_VM_NAME}"
 }
 
 list_tunnels() {
