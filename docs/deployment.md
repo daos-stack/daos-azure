@@ -8,7 +8,7 @@
 ## Quickstart
 
 The following instructions describe how to deploy a DAOS
-cluster using the default settings.
+cluster using pre-defined settings.
 
 The cluster will consist of 3 DAOS server VMs and 3 DAOS client VMs. The
 server and client VMs both use the [Standard_L8s_v3](https://learn.microsoft.com/en-us/azure/virtual-machines/lsv3-series) SKU.
@@ -50,9 +50,13 @@ to deploy all required *[Infrastructure](infrastructure.md)* resources
 
    Edit the `daos-azure.env` file and set only those variables.
 
-   See [Environment Variables](env_vars.md) for more information about the `daos-azure.env` file.
+   For more information about the `daos-azure.env` file see [Environment Variables](env_vars.md).
 
 4. **Deploy **infrastructure** resources (optional)**
+
+   The term "infrastructure" is used to describe the resources that must exist prior to deploying DAOS servers and clients.
+
+   Such resources include a resource group, virtual network, Azure bastion, Key Vault, etc.
 
    ```bash
    cd "${DAOS_AZ_REPO_HOME}/bin"
@@ -94,18 +98,32 @@ to deploy all required *[Infrastructure](infrastructure.md)* resources
 
 7. **Create an SSH tunnel**
 
+   **NOTE:**
+
+   The provided `bin/tunnel.sh` script in this step will modify your `~/.ssh/config` file!
+
+   If you do not want the script to modify your `~/.ssh/config`, run the following command to only
+   print an SSH configuration that you can then manually add to your `~/.ssh/config` file or use as
+   reference for setting up connections in PuTTY or other SSH clients.
+
+   ```bash
+   bin/tunnel.sh --print
+   ```
+
+
+
    To log into the VMs you need to set up an SSH tunnel to the first
-   client VM.
+   DAOS client VM or the first DAOS server VM if you have only deployed DAOS servers. .
 
-   This will allow you to use `ssh` in a terminal on your system to log
-   into the VMs.
+   This will allow you to log into your VMs using SSH on your local system.
 
    ```
-   [Your Machine] ---SSH---> [Azure Bastion] ---SSH---> [Azure VM]
+   [Your System] ---SSH---> [Azure Bastion] ---SSH---> [Azure VM]
          ||                        ||                       ||
-     (localhost)              (Bastion IP)            (VM Private IP)
-        :2022                     :22                      :22
+   (localhost:2022)         (Bastion IP:22)         (VM Private IP:22)
    ```
+
+   Run the following command to modify your `~/.ssh/config` file and create a tunnel.
 
    ```bash
    ./tunnel.sh --create --configure-ssh
@@ -124,58 +142,73 @@ to deploy all required *[Infrastructure](infrastructure.md)* resources
        configures the tunnel on your local system as a jump host for
        the DAOS VMs.
 
-   NOTE: The `tunnel.sh` script sets up the tunnel on `127.0.0.1:2022`.
+   The `tunnel.sh` script sets up the tunnel on `127.0.0.1:2022`.
    If you are using port `2022` on your system for something else, you
    will need to change the value of the `TUNNEL_LOCAL_PORT` variable in
    the `tunnel.sh` script.
 
-8. **Log into the first client VM**
+8. **Log into the VM**
+
+   The `tunnel.sh` script will print the name of the first client VM or first
+   server VM (if you have only deployed DAOS servers) when you run
+   `tunnel.sh --create`.
+
+   The name of the VM displayed by the  `tunnel.sh` script is the VM that you
+   can log into via the tunnel.
+
+   For example
 
    ```bash
    ssh daos-client-000000
    ```
 
-   This will log you in as the `daos_admin` user which has sudo permission.
+   This will log you in as the `daos_admin` user.
+
+   The `daos_admin` user has sudo permission.
+
+   The DAOS management utility `dmg` must always be run with sudo.
 
    NOTE: If the variables in the `daos-azure.env` have been changed from
-   their default values, the name of the client VMs may be different.
-   The `tunnel.sh` script will print the name of the first client VM.
+   their default values, the name of the client or server VM that you will
+   log into may be different that what is shown above.
 
-9. **Check the DAOS storage system**
+
+
+9.  **Check the DAOS storage system**
 
    ```bash
    # Show the status of the servers
    sudo dmg system query -v
 
-   # Show the status of the pool named 'pool1'
+   # Show pool information
    sudo dmg pool list
    sudo dmg storage query usage
    ```
 
-   If the `dmg` command is not available yet or you are seeing errors
+   If the `dmg` command is not available or you are seeing errors
    related to certificates, it may be that the Ansible playbook has not
    finished configuring the system yet.  Wait a few minutes and try again.
    If you still encounter issues, refer to the
-   [Troubleshooting Guide](troubleshooting.md) for tips.
+   [Troubleshooting Guide](troubleshooting.md).
 
-10. **Create and mount [DAOS container](https://docs.daos.io/v2.4/user/container/)**
+10. **Create and mount a [DAOS container](https://docs.daos.io/v2.4/user/container/)**
 
     ```
-    DAOS_POOL_NAME=pool1
-    DAOS_CONTAINER_NAME=cont1
-    DAOS_CONTAINER_MOUNT_DIR=~/daos/$DAOS_CONTAINER_NAME
+    DAOS_POOL_NAME=$(sudo dmg pool list -j | jq -r '.response.pools[0].label')
+    DAOS_CONT_NAME=cont1
+    DAOS_CONT_MOUNT_DIR=~/daos/$DAOS_CONT_NAME
 
     # Create DAOS container
-    daos container create --type=POSIX $DAOS_POOL_NAME $DAOS_CONTAINER_NAME
+    daos container create --type=POSIX $DAOS_POOL_NAME $DAOS_CONT_NAME
 
     # Create mount point
-    mkdir -p $DAOS_CONTAINER_MOUNT_DIR
+    mkdir -p $DAOS_CONT_MOUNT_DIR
 
     # Mount
     dfuse --singlethread \
     --pool=$DAOS_POOL_NAME \
-    --container=$DAOS_CONTAINER_NAME \
-    --mountpoint=$DAOS_CONTAINER_MOUNT_DIR
+    --container=$DAOS_CONT_NAME \
+    --mountpoint=$DAOS_CONT_MOUNT_DIR
 
     # View mount
     df -h -t fuse.daos
@@ -186,15 +219,13 @@ to deploy all required *[Infrastructure](infrastructure.md)* resources
     Create a 20GiB file which will be stored in the DAOS filesystem.
 
     ```bash
-    cd "${DAOS_CONTAINER_MOUNT_DIR}"
-    dd if=/dev/zero of=./${HOSTNAME}_test20G.img bs=1G count=20
+    dd if=/dev/zero of="${DAOS_CONT_MOUNT_DIR}/${HOSTNAME}_test20G.img" bs=1G count=20
     ```
 
 12. **Unmount the DAOS container**
 
     ```bash
-    cd ~/
-    fusermount -u $DAOS_CONTAINER_MOUNT_DIR
+    fusermount -u $DAOS_CONT_MOUNT_DIR
     ```
 
 ## Deleting Resources

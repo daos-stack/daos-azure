@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Copyright (c) 2023 Intel Corporation All rights reserved.
+# Copyright (c) 2024 Intel Corporation All rights reserved.
 # Use of this source code is governed by a BSD-style
 # license that can be found in the LICENSE file.
 
@@ -37,11 +37,12 @@ Usage:
 Options:
 
   [ -e | --env-file DAOS_AZ_ENV_FILE ]  Use specified environment file
-  [ -l | --list ]                       List tunnel(s)
-  [ -c | --create ]                     Create tunnel
-  [ -d | --delete ]                     Delete tunnel
-  [ --configure-ssh ]                   Update ~/.ssh/config with include path
-  [ -h | --help ]                       Show this help
+  [ -l | --list ]     List tunnel(s)
+  [ -c | --create ]   Create tunnel
+  [ -d | --delete ]   Delete tunnel
+  [ -p | --print ]    Print SSH configuration. Do not modify ~/.ssh/config
+  [ --configure-ssh ] Update ~/.ssh/config with include path
+  [ -h | --help ]     Show this help
 
 "
 
@@ -83,11 +84,9 @@ configure_ssh() {
 }
 
 create_ssh_config() {
-  #mkdir -p "${HOME}/.ssh/ctrl"
+  local ssh_config_file="$1"
 
-  log.info "Creating SSH config: '${TUNNEL_SSH_CONFIG_FILE}'"
-
-  cat > "${TUNNEL_SSH_CONFIG_FILE}" <<EOF
+  cat > "${ssh_config_file}" <<EOF
 Host jump
     Hostname 127.0.0.1
     Port ${TUNNEL_LOCAL_PORT}
@@ -96,9 +95,6 @@ Host jump
     IdentitiesOnly yes
     User ${DAOS_AZ_ARM_ADMIN_USER}
     IdentityFile ${DAOS_AZ_SSH_ADMIN_KEY}
-    # ControlPath ~/.ssh/ctrl/%r@%h:%p
-    # ControlMaster auto
-    # ControlPersist yes
 
 Host ${TUNNEL_HOSTNAME_PREFIX}*
     ProxyJump jump
@@ -110,6 +106,19 @@ Host ${TUNNEL_HOSTNAME_PREFIX}*
     IdentityFile ${DAOS_AZ_SSH_ADMIN_KEY}
 
 EOF
+}
+
+print_ssh_config() {
+  local tmp_dir
+  tmp_dir=$(mktemp -d)
+  local tmp_file
+  tmp_file="${tmp_dir}/ssh_config"
+
+  create_ssh_config "${tmp_file}"
+  cat "${tmp_file}"
+  if [[ -d "${tmp_dir}" ]]; then
+    rm -rf "${tmp_dir}"
+  fi
 }
 
 delete_ssh_config() {
@@ -147,10 +156,10 @@ create_tunnel() {
     --resource-port "22" \
     --port "${TUNNEL_LOCAL_PORT}" >/dev/null 2>&1 &
 
-  create_ssh_config
+  log.info "Creating SSH config: '${TUNNEL_SSH_CONFIG_FILE}'"
+  create_ssh_config "${TUNNEL_SSH_CONFIG_FILE}"
 
   log.info "Tunnel through '${TUNNEL_FIRST_VM_NAME}' is now running on 127.0.0.1:${TUNNEL_LOCAL_PORT}"
-  #log.info "To log in run: ssh -i -p ${TUNNEL_LOCAL_PORT} ${TUNNEL_FIRST_VM_NAME}"
 }
 
 list_tunnels() {
@@ -194,6 +203,10 @@ opts() {
       fi
       shift 2
       ;;
+    --print | -p)
+      TUNNEL_ACTION="print"
+      break
+      ;;
     --list | -l)
       TUNNEL_ACTION="list"
       shift
@@ -234,6 +247,9 @@ main() {
   vmss_check
   configure_ssh
   case "${TUNNEL_ACTION}" in
+    print)
+      print_ssh_config
+      ;;
     list)
       list_tunnels
       ;;
