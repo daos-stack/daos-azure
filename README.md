@@ -10,7 +10,7 @@ Automation scripts for deploying DAOS on Azure
 ├── bin/          Bash scripts for deployment
 ├── docs/         Documentation
 ├── tools/        pre-commit tools
-└── vm_files/     Files to be added to self-extracting cloud-init
+└── vm_files/     Files that are added to self-extracting cloud-init scripts
 ```
 
 ## Deploy DAOS on Azure
@@ -31,7 +31,7 @@ The content in this repo was tested with the following versions of software.
 | jq        | 1.6         |
 | makeself  | 2.5.0       |
 | Ansible   | core 2.14.2 |
-| DAOS      | 2.4.0       |
+| DAOS      | 2.6.0       |
 
 ## Links
 
