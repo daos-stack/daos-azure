@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Copyright (c) 2023 Intel Corporation All rights reserved.
+# Copyright (c) 2024 Intel Corporation All rights reserved.
 # Use of this source code is governed by a BSD-style
 # license that can be found in the LICENSE file.
 
@@ -61,6 +61,7 @@ install_ansible() {
   else
     echo "Installing daos_stack.daos ansible collection"
     ansible-galaxy collection install "${DAOS_SERVER_ANSIBLE_COLL_URL}"
+    echo "Installing pip packages required by daos_stack.daos ansible collection"
     ansible-galaxy install -r "${daos_coll_path}/requirements.yml"
     pip install -r "${daos_coll_path}/requirements.txt"
   fi
@@ -73,7 +74,9 @@ install_daos() {
       group_name: \"${DAOS_AZ_CORE_RG_NAME}\",
       location: \"${DAOS_AZ_CORE_LOCATION}\",
       vmss_name: \"${DAOS_AZ_ARM_SERVER_VMSS_NAME}\",
-      vault_name: \"${DAOS_AZ_ARM_KEY_VAULT_NAME}\"
+      vault_name: \"${DAOS_AZ_ARM_KEY_VAULT_NAME}\",
+      daos_version: \"${DAOS_VERSION}\",
+      daos_repo_base_url: \"${DAOS_REPO_BASE_URL}\"
     }"
 }
 

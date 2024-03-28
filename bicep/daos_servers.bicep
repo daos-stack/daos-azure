@@ -15,6 +15,10 @@ param adminUserName string = 'daos_admin'
 param adminPublicKeyData string = ''
 param useAvailabilityZone bool = true
 param availabilityZone int = 1
+param tagValues object = {
+  DAOS_Role: 'Server'
+  Resource_Prefix: (empty(resourcePrefix) ? '' : '${resourcePrefix}')
+}
 
 var subnet = resourceId(resourceGroup().name, 'Microsoft.Network/virtualNetworks/subnets', existingVnetName, existingSubnetName)
 var uamiId = '/subscriptions/${subscription().subscriptionId}/resourceGroups/${resourceGroup().name}/providers/Microsoft.ManagedIdentity/userAssignedIdentities/${existingUamiName}'
@@ -115,6 +119,7 @@ resource vmss 'Microsoft.Compute/virtualMachineScaleSets@2023-03-01' = {
       }
     }
   }
+  tags: tagValues
 }
 
 // Add resourceIds to this array that should be cleaned up

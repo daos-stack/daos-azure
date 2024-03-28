@@ -6,7 +6,7 @@
   - [Checking the status of VMs](#checking-the-status-of-vms)
   - [Logging into VMs via SSH](#logging-into-vms-via-ssh)
     - [Check SSH Keys](#check-ssh-keys)
-      - [Does your ~/.ssh have the proper permissions?](#does-your-ssh-have-the-proper-permissions)
+      - [Does your ~/.ssh directory have the proper permissions?](#does-your-ssh-directory-have-the-proper-permissions)
       - [Do the keys exist and have the correct permissions?](#do-the-keys-exist-and-have-the-correct-permissions)
       - [Have you added your private key to the SSH Agent?](#have-you-added-your-private-key-to-the-ssh-agent)
       - [Do you have a tunnel open?](#do-you-have-a-tunnel-open)
@@ -24,10 +24,10 @@ This document contains information that may be helpful for troubleshooting
 deployment issues.
 
 Throughout the document `DAOS_AZ_REPO_HOME` will be used to refer to the path
-of the local clone of the [daos-stack/daos-azure] repo on your system.
+of the local clone of the [daos-stack/daos-azure](https://github.com/daos-stack/daos-azure) repo on your system.
 
-If you set `DAOS_AZ_REPO_HOME`, you will be able to cut and paste the the
-command examples in this document.
+If you set `DAOS_AZ_REPO_HOME`, you will be able to copy and run the
+example commands in this document.
 
 ## Enable debug logging
 
@@ -115,13 +115,9 @@ done
 
 ## Logging into VMs via SSH
 
-This is a large topic. There are many places for things to go wrong.
+Having trouble logging into VMs via SSH?
 
-Here are some suggestions.
-
-### Check SSH Keys
-
-#### Does your ~/.ssh have the proper permissions?
+### Does your ~/.ssh directory have the proper permissions?
 
 The ~/.ssh/ directory itself should also have restricted permissions to
 ensure that others cannot view or modify its contents.
@@ -134,7 +130,9 @@ for others):
 chmod 700 ~/.ssh
 ```
 
-#### Do the keys exist and have the correct permissions?
+### Do the SSH keys exist and have the correct permissions?
+
+Make sure that the SSH key specified in the daos-azure.env
 
 ```bash
 cd "${DAOS_AZ_REPO_HOME}"
@@ -273,16 +271,35 @@ Log into the VMs
 
 ### Troubleshooting cloud-init files on VMs
 
+The cloud-init file is a self-extracting archive.
 
+Extract the files to the `/root` directory.
 
 ```bash
 /var/lib/cloud/instance/scripts/part-001 --target /root --noexec
 ```
 
+Now the setup script and environment variables file will be extracted to the
+`/root` directory.
+
+```bash
+ll /root/*_setup.*
+-rw-r--r--. 1 501 games 2372 Mar 21 17:38 /root/daos_server_setup.env
+-rwxr-xr-x. 1 501 games 3864 Mar 21 17:25 /root/daos_server_setup.sh
+```
+
+You can now edit the environment variables used by the setup script and then
+run the setup script with `/root/daos_server_setup.sh`.
+
 ### Viewing cloud-init log output
 
 You can grep for 'cloud-init' in `/var/log/messages` on the VMs to view
 the cloud-init log output.
+
+```bash
+grep -i cloud-init /var/log/messages | less
+```
+
 
 cloud-init runs the script that was embedded in the customData
 property of the osProfile for the VM. That script is the

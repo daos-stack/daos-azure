@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Copyright (c) 2023 Intel Corporation All rights reserved.
+# Copyright (c) 2024 Intel Corporation All rights reserved.
 # Use of this source code is governed by a BSD-style
 # license that can be found in the LICENSE file.
 
@@ -75,6 +75,8 @@ install_daos() {
       location: \"${DAOS_AZ_CORE_LOCATION}\",
       vmss_name: \"${DAOS_AZ_ARM_CLIENT_VMSS_NAME}\",
       vault_name: \"${DAOS_AZ_ARM_KEY_VAULT_NAME}\",
+      daos_version: \"${DAOS_VERSION}\",
+      daos_repo_base_url: \"${DAOS_REPO_BASE_URL}\",
       server_host_list: ${DAOS_AZ_SERVER_HOST_LIST}
     }"
 }

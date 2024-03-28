@@ -88,6 +88,9 @@ param nsgSecurityRules array = [
     }
   }
 ]
+param tagValues object = {
+  ResourcePrefix: (empty(resourcePrefix) ? '' : '${resourcePrefix}')
+}
 
 var uamiRoles = [
   {
@@ -117,6 +120,7 @@ var natGatewayPublicIpAddresses = [
 resource managedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
   name: uamiName
   location: location
+  tags: tagValues
 }
 
 resource roleAssignment 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = [for role in uamiRoles: {
@@ -131,6 +135,7 @@ resource roleAssignment 'Microsoft.Authorization/roleAssignments@2020-04-01-prev
 resource natGatewayPublicIp 'Microsoft.Network/publicIPAddresses@2023-04-01' = {
   name: natGatewayPublicIpName
   location: location
+  tags: tagValues
   sku: {
     name: 'Standard'
   }
@@ -150,11 +155,13 @@ resource networkSecurityGroup 'Microsoft.Network/networkSecurityGroups@2023-04-0
   properties: {
     securityRules: nsgSecurityRules
   }
+  tags: tagValues
 }
 
 resource natGateway 'Microsoft.Network/natGateways@2023-04-01' = {
   name: natGatewayName
   location: location
+  tags: tagValues
   sku: {
     name: 'Standard'
   }
@@ -167,6 +174,7 @@ resource natGateway 'Microsoft.Network/natGateways@2023-04-01' = {
 resource virtualNetwork 'Microsoft.Network/virtualNetworks@2023-04-01' = {
   name: virtualNetworkName
   location: location
+  tags: tagValues
   properties: {
     addressSpace: {
       addressPrefixes: [
@@ -193,11 +201,13 @@ resource virtualNetwork 'Microsoft.Network/virtualNetworks@2023-04-01' = {
       }
     ]
   }
+
 }
 
 resource keyVault 'Microsoft.KeyVault/vaults@2022-07-01' = {
   name: keyVaultName
   location: location
+  tags: tagValues
   properties: {
     enabledForDeployment: true
     enabledForDiskEncryption: true
@@ -220,6 +230,7 @@ resource keyVault 'Microsoft.KeyVault/vaults@2022-07-01' = {
 resource keyVaultPrivateEndpoint 'Microsoft.Network/privateEndpoints@2023-04-01' = {
   name: keyVaultPrivateEndpointName
   location: location
+  tags: tagValues
   properties: {
     privateLinkServiceConnections: [
       {
@@ -241,6 +252,7 @@ resource keyVaultPrivateEndpoint 'Microsoft.Network/privateEndpoints@2023-04-01'
 resource keyVaultPrivateDnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' = {
   name: keyVaultprivateDnsZone
   location: 'global'
+  tags: tagValues
 }
 
 resource keyVaultPrivateEndpointDns 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2023-04-01' = {
@@ -262,6 +274,7 @@ resource keyVaultPrivateDnsZoneVnetLink 'Microsoft.Network/privateDnsZones/virtu
   parent: keyVaultPrivateDnsZone
   name: uniqueString(keyVault.id)
   location: 'global'
+  tags: tagValues
   properties: {
     registrationEnabled: false
     virtualNetwork: {
@@ -283,6 +296,7 @@ resource bastionSubnet 'Microsoft.Network/virtualNetworks/subnets@2023-04-01' = 
 resource bastionPublicIp 'Microsoft.Network/publicIPAddresses@2023-04-01' = {
   name: bastionPublicIpName
   location: location
+  tags: tagValues
   sku: {
     name: 'Standard'
     tier: 'Regional'
@@ -295,6 +309,7 @@ resource bastionPublicIp 'Microsoft.Network/publicIPAddresses@2023-04-01' = {
 resource bastionHost 'Microsoft.Network/bastionHosts@2023-04-01' = {
   name: bastionHostName
   location: location
+  tags: tagValues
   sku: {
     name: 'Standard'
   }
@@ -348,3 +363,4 @@ output bastionPublicIpName string = bastionPublicIp.name
 output bastionPublicIpId string = bastionPublicIp.id
 output bastionHostName string = bastionHost.name
 output bastionHostId string = bastionHost.id
+output tags object = tagValues
