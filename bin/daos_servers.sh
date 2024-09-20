@@ -113,7 +113,13 @@ accept_img_terms() {
 deploy() {
   log.info "Deploying DAOS servers"
 
-  accept_img_terms
+  # TODO: The AlmaLinux 8.10 image is not in the Azure Marketplace therefore
+  #       there are no terms to be be accepted.
+  #       Need to figure out how to determine if an image is in the Marketplace
+  #       and then only prompt to accept terms if necessary.
+  #       Commenting this out for now since we are using an image that does not
+  #       require terms to be accepted.
+  # accept_img_terms
   generate_arm
 
   log.info "Creating group deployment: ${DAOS_AZ_ARM_SERVER_GROUP_DEPLOYMENT_NAME}"

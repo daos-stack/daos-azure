@@ -54,7 +54,7 @@ install_ansible() {
   export ANSIBLE_PYTHON_INTERPRETER=/root/.venv/bin/python3
   echo "Installing azure.azcollection ansible collection"
   ansible-galaxy collection install "azure.azcollection"
-  pip install -r ~/.ansible/collections/ansible_collections/azure/azcollection/requirements-azure.txt
+  pip install -r ~/.ansible/collections/ansible_collections/azure/azcollection/requirements.txt
 
   local daos_coll_path="/root/.ansible/collections/ansible_collections/daos_stack/daos"
   if [[ -e "${daos_coll_path}" ]]; then

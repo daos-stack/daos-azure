@@ -24,9 +24,9 @@ var subnet = resourceId(resourceGroup().name, 'Microsoft.Network/virtualNetworks
 var uamiId = '/subscriptions/${subscription().subscriptionId}/resourceGroups/${resourceGroup().name}/providers/Microsoft.ManagedIdentity/userAssignedIdentities/${existingUamiName}'
 var serverImageReference = {
   publisher: 'almalinux'
-  offer: 'almalinux'
+  offer: 'almalinux-x86_64'
   sku: '8-gen2'
-  version: 'latest'
+  version: '8.10.2024082001'
 }
 var serverDataDisks = [for i in range(0, serverDiskCount): {
   caching: serverCacheOption
@@ -37,11 +37,18 @@ var serverDataDisks = [for i in range(0, serverDiskCount): {
   lun: i
   diskSizeGB: serverDiskSize
 }]
-var imagePlan = {
-  name: '8-gen2'
-  publisher: 'almalinux'
-  product: 'almalinux'
-}
+// The imagePlan is necessary if you are using an image that is published in the
+// Azure Marketplace. If you are using an image that is not in the marketplace,
+// you can remove the imagePlan.  Originally we used an Almalinux 8.7 image from
+// the Azure Marketplace, but when we tried to use an Almalinux 8.10 image we
+// encountered errors. The error message stated that the image was not in the
+// Marketplace and that plan information is not required. So this is now
+// commented out.
+// var imagePlan = {
+//   name: '8-gen2'
+//   publisher: 'almalinux'
+//   product: 'almalinux-x86_64'
+// }
 var ciScriptServer = base64(loadTextContent('../bin/cloudinit_server.sh'))
 
 resource vmss 'Microsoft.Compute/virtualMachineScaleSets@2023-03-01' = {
@@ -53,7 +60,8 @@ resource vmss 'Microsoft.Compute/virtualMachineScaleSets@2023-03-01' = {
       '${uamiId}': {}
     }
   }
-  plan: imagePlan
+  // See the comment on the imagePlan variable above
+  // plan: imagePlan
   zones: useAvailabilityZone ? [string(availabilityZone)] : []
   sku: {
     name: serverSku
